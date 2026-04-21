@@ -1,0 +1,29 @@
+[mysqld]
+# Balanced defaults for medium production instances. Tune with real workload metrics.
+innodb_buffer_pool_size = 1G
+innodb_buffer_pool_instances = 1
+innodb_log_file_size = 256M
+innodb_flush_log_at_trx_commit = 1
+innodb_flush_method = O_DIRECT
+
+# Reduce sort-related failures while avoiding runaway per-connection memory.
+sort_buffer_size = 2M
+read_rnd_buffer_size = 512K
+join_buffer_size = 1M
+tmp_table_size = 64M
+max_heap_table_size = 64M
+
+# Connection and thread behavior.
+max_connections = 300
+thread_cache_size = 64
+table_open_cache = 2048
+
+# File handle and packet sizes.
+open_files_limit = 65535
+max_allowed_packet = 64M
+
+# Slow query visibility.
+slow_query_log = 1
+slow_query_log_file = /var/log/mysql/slow.log
+long_query_time = 0.5
+log_queries_not_using_indexes = 0

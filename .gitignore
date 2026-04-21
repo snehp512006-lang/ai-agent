@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+.eggs/
+.dist/
+.build/
+.build/ 
+build/
+dist/
+*.log
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+backend/python.exe/
+
+
+# Django
+staticfiles/
+media/
+*.pot
+
+# Node / frontend
+node_modules/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store
+
+# Vite / build outputs
+frontend/dist/
+frontend/.vite/
+
+# Environment files
+.env
+.env.*
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+
+# Local data
+*.csv
+
+# Runtime artifacts
+*.pid
+*.pid.lock
+*.seed
+*.pid
