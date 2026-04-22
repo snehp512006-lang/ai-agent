@@ -4,7 +4,7 @@ import { CheckCircle2, Loader2 } from 'lucide-react';
 import api from '../api/client';
 import { getApiBaseUrl } from '../api/client';
 import EnterpriseNeuralResult from '../components/AIProcessor/EnterpriseResultSlide';
-import { useAnalysis } from '../context/analysisContext';
+import { useAnalysis } from '../context/useAnalysis';
 import { useTheme } from '../context/ThemeContext';
 import { useLayoutFullscreen } from '../context/LayoutContext';
 import ProcessorHeader from '../features/ai-processor/components/ProcessorHeader';
@@ -1169,7 +1169,7 @@ const AIRealTimeProcessor = () => {
         }
 
         const liveAnalysis = tagAnalysisWithSession(
-          buildAnalysisFromSummary(summary || {}),
+          buildAnalysisFromSummary(summary || {}, backendRowsRef.current),
           uploadId
         );
         setHybridResult(liveAnalysis);
@@ -1233,7 +1233,10 @@ const AIRealTimeProcessor = () => {
           });
         }
 
-        const liveAnalysis = tagAnalysisWithSession(buildAnalysisFromSummary(summary || {}), uploadId);
+        const liveAnalysis = tagAnalysisWithSession(
+          buildAnalysisFromSummary(summary || {}, backendRowsRef.current),
+          uploadId
+        );
         setHybridResult(liveAnalysis);
         setStats(deriveStatsFromAnalysis(liveAnalysis, summary));
         setAnalysis(liveAnalysis);
@@ -1248,10 +1251,11 @@ const AIRealTimeProcessor = () => {
           setPhaseLabel(getPhaseFromProgress(backendProgress));
         }
 
-        const backendAnomalyCount = Number(summary?.out_of_stock || 0)
-          + Number(summary?.low_stock || 0)
-          + Number(summary?.deadstock || 0)
-          + Number(summary?.overstock || 0);
+        const computedStock = liveAnalysis?.stock_analysis || {};
+        const backendAnomalyCount = Number(computedStock?.out_of_stock_items || 0)
+          + Number(computedStock?.low_stock_items || 0)
+          + Number(computedStock?.deadstock_items || 0)
+          + Number(computedStock?.overstock_items || 0);
         setTelemetry({
           etaSeconds: Number(eta || 0),
           recordsPerSecond: Number(rps || 0),
@@ -1545,3 +1549,4 @@ const AIRealTimeProcessor = () => {
 };
 
 export default AIRealTimeProcessor;
+

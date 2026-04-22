@@ -256,6 +256,13 @@ def generate_full_analysis_payload(df: pd.DataFrame) -> dict:
             "overstock": overstock,
             "healthy": healthy,
         },
+        "stock_analysis": {
+            "out_of_stock_items": out_of_stock,
+            "low_stock_items": low_stock,
+            "deadstock_items": deadstock,
+            "overstock_items": overstock,
+            "healthy_items": healthy,
+        },
         "products_analysis": products_analysis,
         # Maintain legacy keys just in case
         "products": products_analysis,

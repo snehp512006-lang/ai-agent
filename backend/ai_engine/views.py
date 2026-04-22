@@ -127,7 +127,7 @@ def _bundle_candidate_dataframes(bundle: dict):
     return candidates
 
 
-def _bundle_rows_for_history(bundle: dict, max_rows: int = 50000):
+def _bundle_rows_for_history(bundle: dict, max_rows: int = 200000):
     """Extract JSON-safe row snapshots, prioritizing transaction sheets for buyer mapping APIs."""
     sheets = (bundle or {}).get("sheets", {})
     rows = []

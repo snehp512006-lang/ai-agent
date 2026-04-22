@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, Search, ShieldCheck, TrendingDown, TrendingUp, Minus, Users, ArrowUpRight } from 'lucide-react';
 import GlassCard from '../components/GlassCard';
 import ProductPurchaseModal from '../components/ProductPurchaseModal';
-import { useAnalysis } from '../context/analysisContext';
+import { useAnalysis } from '../context/useAnalysis';
 import api from '../api/client';
 import { resolveCustomerBehavior, getCustomerBehaviorMeta, toWatchCategory } from '../utils/customerBehaviorContract';
 
@@ -1235,3 +1235,4 @@ const ClientRecords = () => {
 };
 
 export default ClientRecords;
+

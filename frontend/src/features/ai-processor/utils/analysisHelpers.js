@@ -1,7 +1,4 @@
-import { dedupeProductsByIdentity } from '../process/inventoryRisksUtils';
-import { deriveRiskFromSignals, normalizeRisk, toFiniteNumber } from '../process/inventoryRisksCalculations';
-
-const RISK_BUCKETS = ['OUT OF STOCK', 'LOW STOCK', 'OVERSTOCK', 'DEADSTOCK', 'HEALTHY'];
+import { buildInventoryFromTransactions } from '../../inventory-engine/buildInventoryFromTransactions';
 
 export const normalizeRiskLabel = (value) => {
   const raw = String(value || '').toUpperCase().replace(/[_-]+/g, ' ').trim();
@@ -45,65 +42,47 @@ export const deriveCountsFromRows = (rows) => {
 };
 
 export const deriveCanonicalRiskCountsFromRows = (rows = []) => {
-  const normalizedRows = (rows || []).map((row, idx) => {
-    const onHand = toFiniteNumber(
-      row?.on_hand ?? row?.current_stock ?? row?.stock ?? row?.qty_on_hand ?? row?.quantity
-    );
-    const dailyDemand = toFiniteNumber(
-      row?.daily_demand ?? row?.demand_rate ?? row?.sales_velocity ?? row?.avg_daily_sales ?? row?.velocity
-    );
-    const directDays = toFiniteNumber(
-      row?.days_to_stock ?? row?.days_to_stockout ?? row?.days_of_inventory ?? row?.doi
-    );
-    const resolvedDays = directDays ?? (
-      onHand !== null && dailyDemand !== null && dailyDemand > 0
-        ? (onHand / dailyDemand)
-        : null
-    );
-    const derivedRisk = deriveRiskFromSignals({
-      normalizedRisk: normalizeRisk(row?.risk || row?.prediction || row?.ai_classification || row?.inventory_status),
-      onHand,
-      dailyDemand,
-      resolvedDays,
-    });
-
-    return {
-      id: idx + 1,
-      sku: String(
-        row?.sku
-          || row?.product_sku
-          || row?.item_code
-          || row?.product_code
-          || row?.product
-          || row?.name
-          || `product-${idx + 1}`
-      ),
-      name: String(row?.name || row?.product || row?.item_name || row?.sku || `Product-${idx + 1}`),
-      record_date: row?.record_date || row?.date || row?.sales_date || row?.transaction_date || null,
-      risk: derivedRisk,
-    };
-  });
-
-  const dedupedRows = dedupeProductsByIdentity(normalizedRows);
-  return dedupedRows.reduce((acc, row) => {
-    const normalized = normalizeRisk(row?.risk);
-    if (normalized === 'OUT_OF_STOCK') acc.outOfStock += 1;
-    else if (normalized === 'LOW_STOCK') acc.lowStock += 1;
-    else if (normalized === 'OVERSTOCK') acc.overStock += 1;
-    else if (normalized === 'DEADSTOCK') acc.deadstockCount += 1;
-    else acc.healthy += 1;
-    return acc;
-  }, {
-    lowStock: 0,
-    outOfStock: 0,
+  const inventoryModel = buildInventoryFromTransactions(rows);
+  return {
+    lowStock: Number(inventoryModel.stock_analysis?.low_stock_items || 0),
+    outOfStock: Number(inventoryModel.stock_analysis?.out_of_stock_items || 0),
     overStock: 0,
-    healthy: 0,
+    healthy: Number(inventoryModel.stock_analysis?.healthy_items || 0),
     deadstockCount: 0,
     needsReview: 0,
-  });
+  };
 };
 
-export const buildAnalysisFromSummary = (summary = {}) => {
+export const buildAnalysisFromSummary = (summary = {}, rows = []) => {
+  const inventoryModel = buildInventoryFromTransactions(rows, { strictValidation: false });
+  if (inventoryModel.products.length > 0) {
+    return {
+      confidence_score: Number(summary?.confidence_score || 0),
+      confidence_label: summary?.confidence_label || 'Streaming',
+      stock_analysis: {
+        ...inventoryModel.stock_analysis,
+        needs_review_items: 0,
+      },
+      alerts: inventoryModel.products
+        .filter((product) => product.risk !== 'HEALTHY')
+        .map((product) => ({
+          type: String(product.risk).replace(/_/g, ' '),
+          product: product.name || product.sku || 'Inventory requires review',
+          severity: product.risk === 'OUT_OF_STOCK' ? 'CRITICAL' : 'HIGH',
+        })),
+      inventory_summary: {
+        ...inventoryModel.inventory_summary,
+        total_sales: Number(summary?.total_sales || 0),
+      },
+      summary: {
+        ...inventoryModel.summary,
+      },
+      products: inventoryModel.products,
+      products_analysis: rows,
+      _inventory_validation: inventoryModel.validation,
+    };
+  }
+
   const lowStock = Number(summary?.low_stock || 0);
   const outOfStock = Number(summary?.out_of_stock || 0);
   const overstock = Number(summary?.overstock || 0);
@@ -135,16 +114,14 @@ export const buildAnalysisFromSummary = (summary = {}) => {
 };
 
 export const buildLocalAnalysisFromRows = (rows = [], summary = {}) => {
-  const counts = deriveCountsFromRows(rows);
+  const inventoryModel = buildInventoryFromTransactions(rows);
   const alerts = [];
-
-  (rows || []).forEach((row) => {
-    const label = normalizeRiskLabel(row?.prediction || row?.ai_classification || row?.risk || '');
-    if (RISK_BUCKETS.includes(label) && label !== 'HEALTHY') {
+  inventoryModel.products.forEach((product) => {
+    if (product.risk !== 'HEALTHY') {
       alerts.push({
-        type: label,
-        product: row?.product || row?.name || 'Inventory requires review',
-        severity: label === 'OUT OF STOCK' ? 'CRITICAL' : 'HIGH',
+        type: String(product.risk).replace(/_/g, ' '),
+        product: product.name || product.sku || 'Inventory requires review',
+        severity: product.risk === 'OUT_OF_STOCK' ? 'CRITICAL' : 'HIGH',
       });
     }
   });
@@ -153,19 +130,20 @@ export const buildLocalAnalysisFromRows = (rows = [], summary = {}) => {
     confidence_score: Number(summary?.confidence_score || 0),
     confidence_label: summary?.confidence_label || 'Computed',
     stock_analysis: {
-      low_stock_items: counts.lowStock,
-      out_of_stock_items: counts.outOfStock,
-      overstock_items: counts.overStock,
-      healthy_items: counts.healthy,
-      deadstock_items: counts.deadstockCount,
-      needs_review_items: counts.needsReview,
+      ...inventoryModel.stock_analysis,
+      needs_review_items: 0,
     },
     alerts,
     inventory_summary: {
-      total_products: rows.length,
+      ...inventoryModel.inventory_summary,
       total_sales: Number(summary?.total_sales || 0),
     },
+    summary: {
+      ...inventoryModel.summary,
+    },
     products_analysis: rows,
+    products: inventoryModel.products,
+    _inventory_validation: inventoryModel.validation,
   };
 };
 

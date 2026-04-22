@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ComposedChart,
   Area,
@@ -198,6 +198,8 @@ const PredictionChart = ({
 }) => {
   const showPast = mode !== 'present';
   const showForecast = mode !== 'past';
+  const chartHostRef = useRef(null);
+  const [chartHostReady, setChartHostReady] = useState(false);
   const numericHeight = Number(height);
   const isFixedHeight = Number.isFinite(numericHeight) && numericHeight > 0;
   const chartHeight = isFixedHeight ? Math.max(220, numericHeight) : '100%';
@@ -283,6 +285,29 @@ const PredictionChart = ({
       value: last.actual != null ? Number(last.actual) : null,
     };
   }, [pastData, showPast]);
+
+  useEffect(() => {
+    const node = chartHostRef.current;
+    if (!node) return undefined;
+
+    const updateReady = () => {
+      const rect = node.getBoundingClientRect();
+      setChartHostReady(rect.width > 24 && rect.height > 24);
+    };
+
+    updateReady();
+    let observer = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(updateReady);
+      observer.observe(node);
+    }
+    window.addEventListener('resize', updateReady);
+
+    return () => {
+      window.removeEventListener('resize', updateReady);
+      if (observer) observer.disconnect();
+    };
+  }, [chartHeight, showLegend, fullScreen, chartData.length]);
 
   if (!chartData.length || isAnalyzing) {
     return (
@@ -397,9 +422,10 @@ const PredictionChart = ({
       }}
     >
       {showLegend && <CustomLegend mode={mode} />}
-      <div style={{ flex: 1, minHeight: 220, width: '100%' }}>
-        <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={220}>
-          <ComposedChart data={chartData} margin={chartMargin}>
+      <div ref={chartHostRef} style={{ flex: 1, minHeight: 220, width: '100%' }}>
+        {chartHostReady ? (
+          <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={220}>
+            <ComposedChart data={chartData} margin={chartMargin}>
             <defs>
               {/* Enhanced gradients */}
               <linearGradient id="gradPast" x1="0" y1="0" x2="0" y2="1">
@@ -543,8 +569,11 @@ const PredictionChart = ({
                 }} 
               />
           )}
-        </ComposedChart>
-      </ResponsiveContainer>
+            </ComposedChart>
+          </ResponsiveContainer>
+        ) : (
+          <div style={{ width: '100%', height: '100%', minHeight: 220 }} />
+        )}
       </div>
     </motion.div>
   );

@@ -38,7 +38,7 @@ import {
   LabelList,
 } from 'recharts';
 import api from '../api/client';
-import { useAnalysis } from '../context/analysisContext';
+import { useAnalysis } from '../context/useAnalysis';
 
 // ─── Status config for forecast items ──────────────────────────────────────
 const FORECAST_STATUS = {
@@ -1187,3 +1187,4 @@ const ForecastViewer = () => {
 };
 
 export default ForecastViewer;
+

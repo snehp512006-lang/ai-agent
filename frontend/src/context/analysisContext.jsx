@@ -1,23 +1,20 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../api/client';
+import {
+  buildInventoryFromTransactions,
+  extractInventoryRows,
+  DEFAULT_LOW_STOCK_THRESHOLD,
+} from '../features/inventory-engine/buildInventoryFromTransactions';
+import { AnalysisContext } from './analysisContextCore';
 
-const AnalysisContext = createContext(null);
 const LAST_ANALYSIS_STORAGE_KEY = 'ai-ops-last-analysis-snapshot';
+const ANALYSIS_POLL_TIMEOUT_MS = 7000;
 
 const toNum = (value, fallback = 0) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 };
-
-const normalizeRisk = (value) => {
-  const raw = String(value || '').toUpperCase();
-  if (raw.includes('OUT')) return 'OUT_OF_STOCK';
-  if (raw.includes('LOW')) return 'LOW_STOCK';
-  if (raw.includes('DEAD')) return 'DEADSTOCK';
-  if (raw.includes('OVER')) return 'OVERSTOCK';
-  if (raw.includes('HEALTHY') || raw.includes('NORMAL')) return 'HEALTHY';
-  return raw || 'HEALTHY';
-};
+const LOW_STOCK_FALLBACK_THRESHOLD = DEFAULT_LOW_STOCK_THRESHOLD;
 
 const deriveConfidenceLabel = (score) => {
   const s = toNum(score, 0);
@@ -51,62 +48,6 @@ const pickPreferredCustomerName = (customer = {}) => {
   const preferred = candidates.find(isNameLike);
   if (preferred) return preferred;
   return candidates.find((value) => String(value || '').trim()) || null;
-};
-
-const buildProductsFromProductsAnalysis = (productsAnalysis = []) => {
-  return productsAnalysis.map((p, idx) => {
-    const dailySales = toNum(p.daily_sales ?? p.velocity, 0);
-    const stock = toNum(p.current_stock, 0);
-    const daysToStockout = p.days_to_stockout;
-    const movement = String(p.movement_class || '').toUpperCase();
-    let stockRisk = 'HEALTHY';
-    if (stock <= 0) stockRisk = 'OUT_OF_STOCK';
-    else if (movement === 'DEAD_STOCK' || movement === 'DEADSTOCK') stockRisk = 'DEADSTOCK';
-    else if (daysToStockout !== null && daysToStockout !== undefined && Number(daysToStockout) <= 7) stockRisk = 'LOW_STOCK';
-    else if (daysToStockout !== null && daysToStockout !== undefined && Number(daysToStockout) > 120) stockRisk = 'OVERSTOCK';
-    const weekPlan = [1, 2, 3, 4].map((wk) => ({
-      week: `W${wk}`,
-      demand: Math.max(0, Math.round(dailySales * 7)),
-      production: Math.max(0, Math.round(dailySales * 8)),
-    }));
-
-    return {
-      id: idx + 1,
-      sku: String(p.product || `SKU-${idx + 1}`),
-      name: String(p.product || `Product-${idx + 1}`),
-      product: String(p.product || `Product-${idx + 1}`),
-                    "risk": stockRisk,
-                    "current_stock": stock,
-                    "on_hand": stock,
-      sales_velocity: dailySales,
-      daily_demand: dailySales,
-      total_sales: toNum(p.total_sales, 0),
-                    "days_to_stockout": daysToStockout,
-                    "days_to_stock": daysToStockout,
-      confidence_score: toNum(p.confidence_score, 0),
-      reason: p.why || p.WHY || '',
-      recommended_action: p.what || p.WHAT || '',
-      action_plan: Array.isArray(p.how || p.HOW) ? (p.how || p.HOW).join(' | ') : String(p.how || p.HOW || ''),
-      weeks: weekPlan,
-      score: toNum(p.confidence_score, 80),
-      confidence: toNum(p.confidence_score, 80),
-    };
-  });
-};
-
-const deriveStockAnalysis = (products = []) => {
-  const out = products.filter((p) => p.risk === 'OUT_OF_STOCK').length;
-  const low = products.filter((p) => p.risk === 'LOW_STOCK').length;
-  const dead = products.filter((p) => p.risk === 'DEADSTOCK').length;
-  const over = products.filter((p) => p.risk === 'OVERSTOCK').length;
-  const healthy = Math.max(0, products.length - (out + low + dead + over));
-  return {
-    out_of_stock_items: out,
-    low_stock_items: low,
-    deadstock_items: dead,
-    overstock_items: over,
-    healthy_items: healthy,
-  };
 };
 
 const buildCustomersFromCustomerAnalysis = (customerAnalysis = []) => {
@@ -315,9 +256,11 @@ const normalizeAnalysisPayload = (payload) => {
   if (!payload || typeof payload !== 'object') return payload;
 
   const productsAnalysis = Array.isArray(payload.products_analysis) ? payload.products_analysis : [];
-  const products = Array.isArray(payload.products) && payload.products.length
-    ? payload.products
-    : buildProductsFromProductsAnalysis(productsAnalysis);
+  const inventoryRows = extractInventoryRows(payload);
+  const inventoryModel = buildInventoryFromTransactions(inventoryRows, {
+    lowStockThreshold: LOW_STOCK_FALLBACK_THRESHOLD,
+  });
+  const products = inventoryModel.products;
 
   const customerAnalysis = Array.isArray(payload.customer_analysis) ? payload.customer_analysis : [];
   const customerFallback = buildCustomersFromProductsFallback(products);
@@ -326,17 +269,13 @@ const normalizeAnalysisPayload = (payload) => {
     ? incomingCustomers
     : (customerAnalysis.length ? buildCustomersFromCustomerAnalysis(customerAnalysis) : customerFallback);
 
-  const stockAnalysis = payload.stock_analysis && typeof payload.stock_analysis === 'object'
-    ? payload.stock_analysis
-    : deriveStockAnalysis(products);
+  const stockAnalysis = inventoryModel.stock_analysis;
 
   const inventorySummary = {
     ...(payload.inventory_summary || {}),
+    ...inventoryModel.inventory_summary,
   };
 
-  if (inventorySummary.total_stock == null) {
-    inventorySummary.total_stock = inventorySummary.total_current_stock ?? products.reduce((s, p) => s + toNum(p.current_stock, 0), 0);
-  }
   if (inventorySummary.total_sales == null) {
     inventorySummary.total_sales = inventorySummary.total_sales_units ?? products.reduce((s, p) => s + toNum(p.total_sales, 0), 0);
   }
@@ -362,6 +301,8 @@ const normalizeAnalysisPayload = (payload) => {
 
   return {
     ...payload,
+    _inventory_validation: inventoryModel.validation,
+    _inventory_threshold: inventoryModel.low_stock_threshold,
     products_analysis: productsAnalysis,
     products,
     customer_analysis: customerAnalysis,
@@ -382,11 +323,7 @@ const normalizeAnalysisPayload = (payload) => {
       trend: payload.sales_summary?.trend || payload.forecast_summary?.daily_pattern || 'Stable',
     },
     summary: {
-      out_of_stock: toNum(stockAnalysis.out_of_stock_items, 0),
-      low_stock: toNum(stockAnalysis.low_stock_items, 0),
-      deadstock: toNum(stockAnalysis.deadstock_items, 0),
-      overstock: toNum(stockAnalysis.overstock_items, 0),
-      healthy: toNum(stockAnalysis.healthy_items, 0),
+      ...inventoryModel.summary,
     },
     recommendations,
     past_sales_daily: Array.isArray(payload.past_sales_daily) ? payload.past_sales_daily : [],
@@ -482,7 +419,7 @@ export const AnalysisProvider = ({ children }) => {
         const endpoint = selectedUploadId
           ? `/ingestion/upload-analysis/${selectedUploadId}/`
           : '/ingestion/latest-analysis/';
-        const res = await api.get(endpoint);
+        const res = await api.get(endpoint, { timeout: ANALYSIS_POLL_TIMEOUT_MS });
         const nextId = res.data?.upload_id ?? null;
         const nextStatus = res.data?.status ?? null;
         const lockActive = !selectedUploadId && Date.now() < manualLockUntilRef.current;
@@ -598,7 +535,7 @@ export const AnalysisProvider = ({ children }) => {
     localStorage.setItem('ai-ops-selected-upload-id', String(parsed));
     setSelectedUploadId(parsed);
     try {
-      const res = await api.get(`/ingestion/upload-analysis/${parsed}/`);
+      const res = await api.get(`/ingestion/upload-analysis/${parsed}/`, { timeout: ANALYSIS_POLL_TIMEOUT_MS });
       if (res.data?.analysis) {
         const normalized = normalizeAnalysisPayload(res.data.analysis);
         analysisRef.current = normalized;
@@ -642,12 +579,4 @@ export const AnalysisProvider = ({ children }) => {
       {children}
     </AnalysisContext.Provider>
   );
-};
-
-export const useAnalysis = () => {
-  const ctx = useContext(AnalysisContext);
-  if (!ctx) {
-    throw new Error('useAnalysis must be used within AnalysisProvider');
-  }
-  return ctx;
 };

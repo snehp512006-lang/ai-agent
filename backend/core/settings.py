@@ -90,24 +90,35 @@ TEMPLATES = [{
 WSGI_APPLICATION = 'core.wsgi.application'
 
 # ── Database ──────────────────────────────────────────────────────────
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': env.get('MYSQL_DATABASE', 'inventory_db'),
-        'USER': env.get('MYSQL_USER', 'root'),
-        'PASSWORD': env.get('MYSQL_PASSWORD', 'password'),
-        'HOST': env.get('MYSQL_HOST', 'localhost'),
-        'PORT': env.get('MYSQL_PORT', '3306'),
-        'CONN_MAX_AGE': _env_int('DB_CONN_MAX_AGE', 300),
-        'OPTIONS': {
-            'connect_timeout': 30,
-            'read_timeout': _env_int('MYSQL_READ_TIMEOUT', 60),
-            'write_timeout': _env_int('MYSQL_WRITE_TIMEOUT', 60),
-            'charset': 'utf8mb4',
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES';",
-        },
+db_engine = str(env.get('DB_ENGINE', 'mysql')).strip().lower()
+use_sqlite_dev = env.get_bool('USE_SQLITE_DEV', False)
+
+if use_sqlite_dev or db_engine in {'sqlite', 'sqlite3'}:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / env.get('SQLITE_NAME', 'db.sqlite3'),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': env.get('MYSQL_DATABASE', 'inventory_db'),
+            'USER': env.get('MYSQL_USER', 'root'),
+            'PASSWORD': env.get('MYSQL_PASSWORD', 'password'),
+            'HOST': env.get('MYSQL_HOST', 'localhost'),
+            'PORT': env.get('MYSQL_PORT', '3306'),
+            'CONN_MAX_AGE': _env_int('DB_CONN_MAX_AGE', 300),
+            'OPTIONS': {
+                'connect_timeout': 30,
+                'read_timeout': _env_int('MYSQL_READ_TIMEOUT', 60),
+                'write_timeout': _env_int('MYSQL_WRITE_TIMEOUT', 60),
+                'charset': 'utf8mb4',
+                'init_command': "SET sql_mode='STRICT_TRANS_TABLES';",
+            },
+        }
+    }
 
 # ── Cache / Celery ────────────────────────────────────────────────────
 REDIS_URL = env.get('REDIS_URL', 'redis://localhost:6379/0')
@@ -216,7 +227,11 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+if DEBUG:
+    # Keep local development startup simple and avoid manifest/static root warnings.
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+else:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

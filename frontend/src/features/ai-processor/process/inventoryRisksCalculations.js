@@ -20,24 +20,13 @@ export const normalizeRisk = (risk) => {
 };
 
 export const deriveRiskFromSignals = ({ normalizedRisk, onHand, dailyDemand, resolvedDays }) => {
-  if (onHand !== null && onHand <= 0) return 'OUT_OF_STOCK';
-
-  if (['OUT_OF_STOCK', 'LOW_STOCK', 'DEADSTOCK', 'OVERSTOCK'].includes(normalizedRisk)) {
-    return normalizedRisk;
+  const stock = toFiniteNumber(onHand);
+  if (stock === null) {
+    return normalizeRisk(normalizedRisk);
   }
-
-  if (dailyDemand !== null && dailyDemand === 0 && onHand !== null && onHand > 0) {
-    return 'DEADSTOCK';
-  }
-
-  if (typeof resolvedDays === 'number') {
-    if (resolvedDays <= 7) return 'LOW_STOCK';
-    if (resolvedDays > 120) return 'OVERSTOCK';
-    return 'HEALTHY';
-  }
-
-  if (normalizedRisk === 'HEALTHY') return 'HEALTHY';
-  return 'UNKNOWN';
+  if (stock <= 0) return 'OUT_OF_STOCK';
+  if (stock < 10) return 'LOW_STOCK';
+  return 'HEALTHY';
 };
 
 export const buildRiskStatsFromAnalysis = (analysisPayload, fallbackProducts = []) => {

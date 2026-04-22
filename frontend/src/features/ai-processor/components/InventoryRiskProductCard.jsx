@@ -28,12 +28,21 @@ const InventoryRiskProductCard = ({
 
   const totalOrderStock = toFiniteNumber(prod.order_quantity);
   const hasOrderStock = totalOrderStock !== null;
+  const onHandValue = toFiniteNumber(prod.on_hand);
+  const needsArrangeNow = hasOrderStock && totalOrderStock > 0;
+  const pendingPickupQty = toFiniteNumber(prod.pending_party_pickup_qty) ?? 0;
+  const deliveredQty = toFiniteNumber(prod.delivered_to_party_qty) ?? 0;
+  const totalInQty = toFiniteNumber(prod.total_in);
+  const totalReturnQty = toFiniteNumber(prod.total_return);
+  const hasOrderFormulaBreakup = totalInQty !== null || totalReturnQty !== null;
 
   let stockRequired = null;
-  if (toFiniteNumber(prod.on_hand) === 0 && hasOrderStock) {
+  if (onHandValue === 0 && hasOrderStock) {
     stockRequired = totalOrderStock;
-  } else if (hasOrderStock && toFiniteNumber(prod.on_hand) !== null && toFiniteNumber(prod.reorder) !== null) {
-    const diff = toFiniteNumber(prod.reorder) - toFiniteNumber(prod.on_hand);
+  } else if (needsArrangeNow && hasOrderStock) {
+    stockRequired = totalOrderStock;
+  } else if (hasOrderStock && onHandValue !== null && toFiniteNumber(prod.reorder) !== null) {
+    const diff = toFiniteNumber(prod.reorder) - onHandValue;
     stockRequired = diff > 0 ? diff : 0;
   }
 
@@ -110,7 +119,19 @@ const InventoryRiskProductCard = ({
             ) : (
               <span className="text-sm font-bold text-slate-400">-</span>
             )}
-            <p className="text-[10px] text-[var(--text-muted)] mt-1">Total units ordered for this product.</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">
+              {needsArrangeNow
+                ? 'Arrange quantity required to fulfill current demand.'
+                : 'No immediate arrangement required.'}
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">
+              Qty(-) pending pickup: {formatUnitsValue(pendingPickupQty)} | Qty(+) delivered: {formatUnitsValue(deliveredQty)}
+            </p>
+            {hasOrderFormulaBreakup && (
+              <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                Formula: Qty(IN) {formatUnitsValue(totalInQty ?? 0)} - Qty(RETURN) {formatUnitsValue(totalReturnQty ?? 0)}
+              </p>
+            )}
           </div>
         </div>
 
@@ -136,16 +157,12 @@ const InventoryRiskProductCard = ({
           <div className="flex items-center justify-between gap-1">
             <button
               onClick={() => setSelectedProduct({ prod, actionPlan })}
-              className="flex-1 py-2 rounded-lg bg-slate-50 border border-slate-100 text-[9px] font-bold uppercase tracking-widest text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all flex items-center justify-center gap-2"
+              className={`flex-[1.5] py-2 rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 text-[9px] font-black uppercase tracking-widest ${riskFromStatus === 'OUT_OF_STOCK' || riskFromStatus === 'LOW_STOCK'
+                ? 'bg-rose-500 text-slate-950 shadow-rose-500/10'
+                : 'bg-emerald-500 text-slate-950 shadow-emerald-500/10'
+                }`}
             >
               View Details
-            </button>
-            <button className={`flex-[1.5] py-2 rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 text-[9px] font-black uppercase tracking-widest ${riskFromStatus === 'OUT_OF_STOCK' || riskFromStatus === 'LOW_STOCK'
-              ? 'bg-rose-500 text-slate-950 shadow-rose-500/10'
-              : 'bg-emerald-500 text-slate-950 shadow-emerald-500/10'
-              }`}>
-              {riskFromStatus === 'OUT_OF_STOCK' ? 'Order Now' : (riskFromStatus === 'LOW_STOCK' ? 'Restock Now' : 'Adjust Supply')}
-              <ArrowRight size={14} />
             </button>
           </div>
         </div>

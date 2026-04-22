@@ -25,7 +25,7 @@ import jsPDF from 'jspdf';
 import api from '../api/client';
 import GlassCard from '../components/GlassCard';
 import PredictionChart from '../components/PredictionChart';
-import { useAnalysis } from '../context/analysisContext';
+import { useAnalysis } from '../context/useAnalysis';
 import { useTheme } from '../context/ThemeContext';
 
 const statusClassMap = {
@@ -2042,3 +2042,4 @@ const PredictiveAudit = () => {
 };
 
 export default PredictiveAudit;
+

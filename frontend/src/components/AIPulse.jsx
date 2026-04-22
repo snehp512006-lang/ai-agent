@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Brain, Activity, Target, ShieldCheck, Box, AlertCircle } from 'lucide-react';
 import api from '../api/client';
-import { useAnalysis } from '../context/analysisContext';
+import { useAnalysis } from '../context/useAnalysis';
 
 const ICON_MAP = {
   'Activity': Activity,
@@ -163,4 +163,5 @@ const AIPulse = () => {
 };
 
 export default AIPulse;
+
 

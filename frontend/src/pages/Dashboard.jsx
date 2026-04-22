@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/client';
-import { useAnalysis } from '../context/analysisContext';
+import { useAnalysis } from '../context/useAnalysis';
 import { useLayoutFullscreen } from '../context/LayoutContext';
 import {
   ResponsiveContainer,
@@ -876,15 +876,55 @@ const withTimeout = async (promise, timeoutMs = 5000) => {
 };
 
 const isTimeoutError = (err) => String(err?.message || '').toLowerCase().includes('timeout');
+const DASHBOARD_FAST_TIMEOUT_MS = 8000;
+const DASHBOARD_FORECAST_TIMEOUT_MS = 10000;
+const DASHBOARD_FORECAST_CACHE_TTL_MS = 5 * 60 * 1000;
+const DASHBOARD_FORECAST_RETRY_COOLDOWN_MS = 60 * 1000;
+
+const getWithTimeout = (url, timeoutMs = DASHBOARD_FAST_TIMEOUT_MS) => api.get(url, { timeout: timeoutMs });
 
 const fetchLatestAnalysisWithRetry = async (timeoutMs) => {
   try {
-    return await withTimeout(api.get('/ingestion/latest-analysis/'), timeoutMs);
+    return await getWithTimeout('/ingestion/latest-analysis/', timeoutMs);
   } catch (firstErr) {
     if (!isTimeoutError(firstErr)) throw firstErr;
     // One fast retry helps when backend workers are under temporary load.
-    return await withTimeout(api.get('/ingestion/latest-analysis/'), timeoutMs + 4000);
+    return await getWithTimeout('/ingestion/latest-analysis/', timeoutMs + 2000);
   }
+};
+
+const ChartMountContainer = ({ className = 'h-56', children }) => {
+  const hostRef = useRef(null);
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    const node = hostRef.current;
+    if (!node) return undefined;
+
+    const updateReady = () => {
+      const rect = node.getBoundingClientRect();
+      setIsReady(rect.width > 24 && rect.height > 24);
+    };
+
+    updateReady();
+    let observer = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(updateReady);
+      observer.observe(node);
+    }
+    window.addEventListener('resize', updateReady);
+
+    return () => {
+      window.removeEventListener('resize', updateReady);
+      if (observer) observer.disconnect();
+    };
+  }, []);
+
+  return (
+    <div ref={hostRef} className={className}>
+      {isReady ? children : <div className="w-full h-full min-h-[220px]" />}
+    </div>
+  );
 };
 
 const Dashboard = () => {
@@ -909,6 +949,7 @@ const Dashboard = () => {
   const hasUserSelectedForecastModeRef = useRef(false);
   const backgroundBackfillStartedRef = useRef(false);
   const timeoutInfoShownRef = useRef(false);
+  const forecastCacheRef = useRef({ fetchedAt: 0, pending: false, retryAfter: 0 });
 
   const handleForecastModeChange = (mode) => {
     hasUserSelectedForecastModeRef.current = true;
@@ -1223,7 +1264,7 @@ const Dashboard = () => {
 
   const findRecentUsableAnalysis = async () => {
     try {
-      const uploadsRes = await api.get('/ingestion/uploads-list/?limit=60');
+      const uploadsRes = await getWithTimeout('/ingestion/uploads-list/?limit=60', 5000);
       const uploads = Array.isArray(uploadsRes?.data) ? uploadsRes.data : [];
 
       // Keep this lightweight: list endpoint does not need embedded analysis blobs.
@@ -1232,20 +1273,25 @@ const Dashboard = () => {
         return status === 'COMPLETED' || status === 'SUCCESS';
       });
 
-      for (const candidate of terminalCandidates.slice(0, 8)) {
-        const uploadId = Number(candidate?.id);
-        if (!Number.isFinite(uploadId) || uploadId <= 0) continue;
+      const candidateIds = terminalCandidates
+        .slice(0, 6)
+        .map((candidate) => Number(candidate?.id))
+        .filter((id) => Number.isFinite(id) && id > 0);
 
+      const candidateFetches = candidateIds.map(async (uploadId) => {
         try {
-          const uploadRes = await api.get(`/ingestion/upload-analysis/${uploadId}/`);
+          const uploadRes = await getWithTimeout(`/ingestion/upload-analysis/${uploadId}/`, 4500);
           const uploadPayload = uploadRes?.data || null;
           if (uploadPayload?.analysis) return uploadPayload.analysis;
-
-          const fallback = buildFallbackAnalysisFromLatestPayload(uploadPayload || {});
-          if (fallback) return fallback;
+          return buildFallbackAnalysisFromLatestPayload(uploadPayload || {});
         } catch {
-          // Continue scanning older uploads.
+          return null;
         }
+      });
+
+      const settled = await Promise.allSettled(candidateFetches);
+      for (const row of settled) {
+        if (row.status === 'fulfilled' && row.value) return row.value;
       }
     } catch {
       // If uploads-list fails, keep existing fallback path.
@@ -1254,37 +1300,51 @@ const Dashboard = () => {
     return null;
   };
 
+  const refreshAdvancedForecast = async () => {
+    const now = Date.now();
+    if (forecastCacheRef.current.pending) return;
+    if ((now - forecastCacheRef.current.fetchedAt) < DASHBOARD_FORECAST_CACHE_TTL_MS) return;
+    if (now < (forecastCacheRef.current.retryAfter || 0)) return;
+
+    forecastCacheRef.current.pending = true;
+    try {
+      const advForecastRes = await getWithTimeout('/ai/forecast/?days=365', DASHBOARD_FORECAST_TIMEOUT_MS);
+      if (advForecastRes?.data) {
+        const { historical, forecast } = advForecastRes.data;
+
+        if (Array.isArray(historical)) {
+          setPastDailyData(historical.map((d) => ({
+            date: d.date,
+            actual: d.value,
+          })));
+        }
+
+        if (Array.isArray(forecast)) {
+          setForecastRawData(forecast.map((d) => ({
+            date: d.date,
+            predicted: d.value,
+            lower: d.lower,
+            upper: d.upper,
+          })));
+        }
+      }
+      forecastCacheRef.current.fetchedAt = now;
+    } catch (advErr) {
+      forecastCacheRef.current.retryAfter = now + DASHBOARD_FORECAST_RETRY_COOLDOWN_MS;
+      if (!isTimeoutError(advErr)) {
+        console.error('Failed to fetch advanced forecast:', advErr);
+      }
+    } finally {
+      forecastCacheRef.current.pending = false;
+    }
+  };
+
   const fetchDashboardData = async ({ showLoader = false, preferLive = true } = {}) => {
     try {
       if (showLoader) setLoading(true);
 
-      // 1. Fetch High-Accuracy Ensemble Forecast from the new endpoint
-      try {
-        const advForecastRes = await api.get('/ai/forecast/?days=365');
-        if (advForecastRes?.data) {
-          const { historical, forecast, metrics, trend } = advForecastRes.data;
-          
-          if (Array.isArray(historical)) {
-            setPastDailyData(historical.map(d => ({
-              date: d.date,
-              actual: d.value
-            })));
-          }
-          
-          if (Array.isArray(forecast)) {
-            setForecastRawData(forecast.map(d => ({
-              date: d.date,
-              predicted: d.value,
-              lower: d.lower,
-              upper: d.upper
-            })));
-          }
-          
-          // You could store metrics in state if needed for UI cards
-        }
-      } catch (advErr) {
-        console.error('Failed to fetch advanced forecast:', advErr);
-      }
+      // Run expensive forecast in background so initial dashboard paint is never blocked.
+      refreshAdvancedForecast();
 
       let analysisPayload = preferLive ? (liveAnalysis || null) : null;
       let latestPayload = null;
@@ -1315,7 +1375,7 @@ const Dashboard = () => {
           }
         } else {
           try {
-            analysisPayload = await withTimeout(findRecentUsableAnalysis(), 12000);
+            analysisPayload = await withTimeout(findRecentUsableAnalysis(), 9000);
           } catch {
             analysisPayload = null;
           }
@@ -1341,7 +1401,7 @@ const Dashboard = () => {
 
       let decisions = [];
       try {
-        const decisionRes = await api.get('/ai/decisions/');
+        const decisionRes = await getWithTimeout('/ai/decisions/', 5000);
         decisions = Array.isArray(decisionRes?.data?.decisions) ? decisionRes.data.decisions : [];
       } catch (decisionErr) {
         decisions = [];
@@ -2181,7 +2241,7 @@ const Dashboard = () => {
                 </button>
               </div>
               <div className="p-5 space-y-4">
-                <div className="h-56">
+                <ChartMountContainer className="h-56">
                   <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={220}>
                     <PieChart>
                       <Pie
@@ -2208,7 +2268,7 @@ const Dashboard = () => {
                       />
                     </PieChart>
                   </ResponsiveContainer>
-                </div>
+                </ChartMountContainer>
 
                 <div className="grid grid-cols-3 gap-3 pt-4 border-t border-slate-200/40 dark:border-white/10">
                   {riskPieData.map((item) => (
@@ -2376,7 +2436,7 @@ const Dashboard = () => {
                 </button>
               </div>
               <div className="p-5 space-y-4">
-                <div className="h-48">
+                <ChartMountContainer className="h-56">
                   <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={220}>
                     <BarChart data={customerTrendData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" />
@@ -2402,7 +2462,7 @@ const Dashboard = () => {
                       />
                     </BarChart>
                   </ResponsiveContainer>
-                </div>
+                </ChartMountContainer>
 
                 <div className="pt-4 border-t border-slate-200/40 dark:border-white/10 grid grid-cols-3 gap-3">
                   {customerTrendData.map((item, idx) => {
@@ -2572,7 +2632,7 @@ const Dashboard = () => {
                   </button>
                 </div>
                 <div className="p-8 max-h-[70vh] overflow-y-auto">
-                  <div className="h-96 mb-8">
+                  <ChartMountContainer className="h-96 mb-8">
                     <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={220}>
                       <PieChart>
                         <Pie
@@ -2599,7 +2659,7 @@ const Dashboard = () => {
                         />
                       </PieChart>
                     </ResponsiveContainer>
-                  </div>
+                  </ChartMountContainer>
                   <div className="grid grid-cols-3 gap-4">
                     {riskPieData.map((item) => (
                       <div key={item.name} className="p-6 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/10">
@@ -2800,7 +2860,7 @@ const Dashboard = () => {
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300">Sales Trend (Swap Mode)</p>
                       <p className="text-[10px] font-bold text-slate-500">Mode: {salesInsights.scopeLabel}</p>
                     </div>
-                    <div className="h-72">
+                    <ChartMountContainer className="h-72">
                       <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={220}>
                         <LineChart
                           data={salesModalTrendData}
@@ -2839,7 +2899,7 @@ const Dashboard = () => {
                           )}
                         </LineChart>
                       </ResponsiveContainer>
-                    </div>
+                    </ChartMountContainer>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -2942,7 +3002,7 @@ const Dashboard = () => {
                   </button>
                 </div>
                 <div className="p-8 max-h-[70vh] overflow-y-auto">
-                  <div className="h-80 mb-8">
+                  <ChartMountContainer className="h-80 mb-8">
                     <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={220}>
                       <BarChart data={customerTrendData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
@@ -2965,7 +3025,7 @@ const Dashboard = () => {
                         />
                       </BarChart>
                     </ResponsiveContainer>
-                  </div>
+                  </ChartMountContainer>
                   <div className="grid grid-cols-3 gap-4">
                     {customerTrendData.map((item, idx) => {
                       const colorSchemes = [
@@ -3052,3 +3112,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+

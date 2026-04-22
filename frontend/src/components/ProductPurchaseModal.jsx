@@ -6,7 +6,7 @@ import {
   Clock, AlertTriangle, Star, SlidersHorizontal, Loader2
 } from 'lucide-react';
 import api from '../api/client';
-import { useAnalysis } from '../context/analysisContext';
+import { useAnalysis } from '../context/useAnalysis';
 import { resolveCustomerBehavior, getCustomerBehaviorMeta, CUSTOMER_BEHAVIOR } from '../utils/customerBehaviorContract';
 
 // ─── Plain-English status labels ─────────────────────────────────────────────
@@ -932,3 +932,4 @@ const ProductPurchaseModal = ({ isOpen, onClose, client, analysisData = null }) 
 };
 
 export default ProductPurchaseModal;
+

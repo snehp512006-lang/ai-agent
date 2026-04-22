@@ -19,7 +19,7 @@ import {
   Truck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAnalysis } from '../context/analysisContext';
+import { useAnalysis } from '../context/useAnalysis';
 import InventoryRiskProductCard from '../features/ai-processor/components/InventoryRiskProductCard';
 import { useInventoryRisksData } from '../features/ai-processor/process/useInventoryRisksData';
 import {
@@ -30,7 +30,6 @@ import {
   PARTY_NAME_ALIASES,
   PARTY_ID_ALIASES,
   parseDateValue,
-  formatDateTime,
   formatSqlDateTime,
   formatCurrencyINR,
   normalizeText,
@@ -45,7 +44,6 @@ import {
 } from '../features/ai-processor/process/inventoryRisksUtils';
 import {
   normalizeRisk,
-  deriveRiskFromSignals,
   buildRiskStatsFromAnalysis,
   toFiniteNumber,
   normalizeFieldName,
@@ -129,115 +127,22 @@ const InventoryRisks = () => {
     .map((group) => group.items[0]);
 
   const getProductMetrics = (prod) => {
-    if (prod.status === 'FIELD MAPPING ERROR') {
-      return {
-        daysToStockout: 'INSUFFICIENT DATA',
-        healthStatus: 'INSUFFICIENT DATA',
-        orderQuantity: 'NOT DEFINED',
-        recommendation: 'INSUFFICIENT DATA',
-        stockoutDateTime: 'INSUFFICIENT DATA',
-        predicted7DayDemand: 'INSUFFICIENT DATA',
-      };
-    }
-
-    if (prod.status === 'SUCCESS' && prod.health_status) {
-      const hs = prod.health_status;
-      const normalizedRisk = normalizeRisk(prod.risk);
-
-      if (normalizedRisk === 'OVERSTOCK' || hs === 'OVERSTOCK') {
-        return {
-          daysToStockout: 'NOT APPLICABLE',
-          healthStatus: 'OVERSTOCK',
-          orderQuantity: 0,
-          recommendation: 'Pause procurement and clear excess inventory',
-          stockoutDateTime: 'NOT APPLICABLE',
-          predicted7DayDemand: prod.predicted_7_day_demand ?? 'INSUFFICIENT DATA',
-        };
-      }
-
-      if (normalizedRisk === 'DEADSTOCK' || hs === 'DEADSTOCK') {
-        return {
-          daysToStockout: 'NOT APPLICABLE',
-          healthStatus: 'DEADSTOCK',
-          orderQuantity: 0,
-          recommendation: 'Stop buying and run liquidation campaign',
-          stockoutDateTime: 'NOT APPLICABLE',
-          predicted7DayDemand: prod.predicted_7_day_demand ?? 'INSUFFICIENT DATA',
-        };
-      }
-
-      const recommendation = hs === 'CRITICAL'
-        ? 'Reorder immediately'
-        : (hs === 'LOW STOCK' ? 'Plan replenishment this week' : 'No immediate action needed');
-
-      const numericOrder = toFiniteNumber(prod.order_quantity);
-      return {
-        daysToStockout: prod.days_to_stock,
-        healthStatus: hs,
-        orderQuantity: numericOrder !== null ? Math.max(Math.ceil(numericOrder), 0) : 'INSUFFICIENT DATA',
-        recommendation,
-        stockoutDateTime: prod.stockout_datetime ?? 'INSUFFICIENT DATA',
-        predicted7DayDemand: prod.predicted_7_day_demand ?? 'INSUFFICIENT DATA',
-      };
-    }
-
-    const onHand = toFiniteNumber(prod.on_hand);
-    const dailyDemand = toFiniteNumber(prod.daily_demand);
-    const predicted7 = toFiniteNumber(prod.predicted_7_day_demand);
-
-    if (onHand === null) {
-      return {
-        daysToStockout: 'INSUFFICIENT DATA',
-        healthStatus: 'INSUFFICIENT DATA',
-        orderQuantity: 'INSUFFICIENT DATA',
-        recommendation: 'INSUFFICIENT DATA',
-        stockoutDateTime: 'INSUFFICIENT DATA',
-        predicted7DayDemand: 'INSUFFICIENT DATA',
-      };
-    }
-
-    if (dailyDemand === null) {
-      return {
-        daysToStockout: 'INSUFFICIENT DATA',
-        healthStatus: 'INSUFFICIENT DATA',
-        orderQuantity: 'INSUFFICIENT DATA',
-        recommendation: 'INSUFFICIENT DATA',
-        stockoutDateTime: 'INSUFFICIENT DATA',
-        predicted7DayDemand: 'INSUFFICIENT DATA',
-      };
-    }
-
-    if (dailyDemand === 0) {
-      return {
-        daysToStockout: 'NO DEMAND',
-        healthStatus: 'HEALTHY',
-        orderQuantity: 0,
-        recommendation: 'No action needed',
-        stockoutDateTime: 'NO DEMAND',
-        predicted7DayDemand: 0,
-      };
-    }
-
-    const daysToStockout = onHand / dailyDemand;
-    const healthStatus = daysToStockout > 7 ? 'HEALTHY' : (daysToStockout >= 3 ? 'LOW STOCK' : 'CRITICAL');
-    const predicted7DayDemand = predicted7 !== null ? predicted7 : (dailyDemand * 7);
-    const orderQuantity = Math.max(Math.ceil(predicted7DayDemand - onHand), 0);
-
-    const stockoutDate = new Date(Date.now() + (daysToStockout * 24 * 60 * 60 * 1000));
-
-    const recommendation = healthStatus === 'CRITICAL'
+    const normalizedRisk = normalizeRisk(prod?.risk);
+    const healthStatus = normalizedRisk === 'OUT_OF_STOCK'
+      ? 'CRITICAL'
+      : (normalizedRisk === 'LOW_STOCK' ? 'LOW STOCK' : 'HEALTHY');
+    const recommendation = normalizedRisk === 'OUT_OF_STOCK'
       ? 'Reorder immediately'
-      : (healthStatus === 'LOW STOCK'
-        ? 'Monitor weekly'
-        : 'No action needed');
+      : (normalizedRisk === 'LOW_STOCK' ? 'Plan replenishment this week' : 'No immediate action needed');
+    const numericOrder = toFiniteNumber(prod?.order_quantity);
 
     return {
-      daysToStockout,
+      daysToStockout: prod?.days_to_stock ?? 'INSUFFICIENT DATA',
       healthStatus,
-      orderQuantity,
+      orderQuantity: numericOrder !== null ? Math.max(Math.ceil(numericOrder), 0) : 'INSUFFICIENT DATA',
       recommendation,
-      stockoutDateTime: formatDateTime(stockoutDate),
-      predicted7DayDemand,
+      stockoutDateTime: prod?.stockout_datetime ?? 'INSUFFICIENT DATA',
+      predicted7DayDemand: prod?.predicted_7_day_demand ?? 'INSUFFICIENT DATA',
     };
   };
 
@@ -332,12 +237,13 @@ const InventoryRisks = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6">
         {[
           { label: 'Out of Stock', count: riskStats.out_of_stock, icon: AlertCircle, color: '#ef4444', gradient: 'from-rose-500/20 to-transparent' },
           { label: 'Low Stock', count: riskStats.low_stock, icon: TrendingDown, color: '#f59e0b', gradient: 'from-amber-500/20 to-transparent' },
           { label: 'Deadstock', count: riskStats.deadstock, icon: Package, color: '#6366f1', gradient: 'from-indigo-500/20 to-transparent' },
           { label: 'Overstock', count: riskStats.overstock, icon: Package, color: '#a855f7', gradient: 'from-purple-500/20 to-transparent' },
+          { label: 'Healthy', count: riskStats.healthy, icon: CheckCircle2, color: '#10b981', gradient: 'from-emerald-500/20 to-transparent' },
         ].map((s, i) => (
           <motion.div
             key={i}
@@ -361,20 +267,7 @@ const InventoryRisks = () => {
       {analysisReady ? (
         <>
           <div className="flex flex-col gap-3 pb-2">
-            <div className="flex items-center gap-2 p-1.5 bg-[var(--bg-sidebar)] rounded-2xl border border-[var(--border-subtle)] w-fit">
-              {['ALL', 'OUT_OF_STOCK', 'LOW_STOCK', 'DEADSTOCK', 'OVERSTOCK', 'HEALTHY'].map(f => (
-                <button
-                  key={f}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${filter === f
-                    ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
-                    : 'text-[var(--text-muted)] hover:text-emerald-500 hover:bg-emerald-500/5'
-                    }`}
-                  onClick={() => setFilter(f)}
-                >
-                  {f.replace(/_/g, ' ')}
-                </button>
-              ))}
-            </div>
+
             <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3">
               <div className="flex flex-col lg:flex-row lg:items-center gap-3">
                 <div className="relative group flex-1 min-w-[260px]">
@@ -644,98 +537,98 @@ const InventoryRisks = () => {
                         const latestDeliveryDate = deliveryDates[0] || 'Not Scheduled';
                         return (
                           <>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'white', border: '1px solid #10b981' }}>
-                            <span className="text-lg font-bold text-emerald-600">{cust.name?.charAt(0) || 'C'}</span>
-                          </div>
-                          <div>
-                            <h4 className="text-base font-bold text-slate-900 leading-tight uppercase tracking-tight">{cust.name || 'Unknown Client'}</h4>
-                            <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mt-1 flex items-center gap-2">
-                              <span className="w-1 h-3 bg-emerald-500 rounded-full"></span>
-                              {cust.company || 'Direct Buyer Partner'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <div className={`px-2 py-1 rounded text-[9px] font-bold tracking-widest uppercase border ${cust.risk_level === 'Low' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                            (cust.risk_level === 'Medium' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200')
-                            }`}>
-                            {cust.risk_level} PROFILE
-                          </div>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">AI AGENT VERIFIED</span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 rounded-2xl bg-white border border-slate-100 shadow-sm relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 blur-3xl -mr-12 -mt-12 rounded-full"></div>
-
-                        <div className="border-r border-slate-100 pr-4">
-                          <span className="block text-[11px] font-bold text-slate-500 mb-1">Total Unit</span>
-                          <span className="text-lg font-bold text-slate-900 leading-none">{cust.total_purchased || 0} <span className="text-[10px] text-slate-400 font-bold">U</span></span>
-                        </div>
-
-                        <div className="border-r border-slate-100 pr-4">
-                          <span className="block text-[11px] font-bold text-slate-500 mb-1">Orders</span>
-                          <span className="text-sm font-bold text-slate-700">{orderEvents.length || orderDates.length} total</span>
-                          <p className="text-[11px] font-semibold text-slate-500 mt-1">Latest: {latestOrderDate}</p>
-                        </div>
-
-                        <div className="pl-2">
-                          <span className="block text-[11px] font-bold text-emerald-700 mb-1">Delivery Date</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                            <span className="text-sm font-bold text-slate-900">{latestDeliveryDate}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl bg-white border border-slate-100 p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Order & Delivery Timeline</span>
-                          <span className="text-[10px] font-bold text-slate-400">{orderEvents.length || orderDates.length} records</span>
-                        </div>
-
-                        {orderEvents.length === 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-slate-600">
-                            {orderDates.map((dateValue, idx2) => (
-                              <div key={`timeline-fallback-${idx2}`} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
-                                <p className="font-bold text-slate-700">Order: {dateValue}</p>
-                                <p className="text-slate-500">Delivery: {deliveryDates[idx2] || latestDeliveryDate}</p>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="max-h-36 overflow-y-auto pr-1 space-y-2">
-                            {orderEvents.map((evt, idx2) => (
-                              <div key={`timeline-${idx2}`} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
-                                <div className="flex items-center justify-between gap-2">
-                                  <p className="text-[11px] font-bold text-slate-700">Order: {evt.order_date || 'Unknown'}</p>
-                                  <p className="text-[11px] font-bold text-slate-900">{toUnitsSafe(evt.units)} U</p>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'white', border: '1px solid #10b981' }}>
+                                  <span className="text-lg font-bold text-emerald-600">{cust.name?.charAt(0) || 'C'}</span>
                                 </div>
-                                <p className="text-[11px] text-slate-500 mt-0.5">Delivery: {evt.delivery_date || 'Not Scheduled'}</p>
+                                <div>
+                                  <h4 className="text-base font-bold text-slate-900 leading-tight uppercase tracking-tight">{cust.name || 'Unknown Client'}</h4>
+                                  <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mt-1 flex items-center gap-2">
+                                    <span className="w-1 h-3 bg-emerald-500 rounded-full"></span>
+                                    {cust.company || 'Direct Buyer Partner'}
+                                  </p>
+                                </div>
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                              <div className="flex flex-col items-end gap-1">
+                                <div className={`px-2 py-1 rounded text-[9px] font-bold tracking-widest uppercase border ${cust.risk_level === 'Low' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                  (cust.risk_level === 'Medium' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200')
+                                  }`}>
+                                  {cust.risk_level} PROFILE
+                                </div>
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">AI AGENT VERIFIED</span>
+                              </div>
+                            </div>
 
-                      <div className="flex items-center justify-between pt-1">
-                        <div className="flex items-center gap-3">
-                          <div className="px-3 py-1 rounded-full bg-slate-50 border border-slate-200 flex items-center gap-2">
-                            <BrainCircuit size={10} className="text-slate-400" />
-                            <span className={`text-[10px] font-bold ${cust.trend_tag?.includes('Drop') ? 'text-rose-500' : (cust.trend_tag?.includes('Increasing') ? 'text-emerald-600' : 'text-slate-500')
-                              }`}>
-                              Trend: {cust.trend_tag}
-                            </span>
-                          </div>
-                        </div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 rounded-2xl bg-white border border-slate-100 shadow-sm relative overflow-hidden">
+                              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 blur-3xl -mr-12 -mt-12 rounded-full"></div>
 
-                        <div className="flex items-center gap-2 text-slate-400 font-bold text-[10px] px-3 py-1.5 rounded-lg border border-slate-100 bg-slate-50">
-                          <Truck size={12} />
-                          Auto-Schedule
-                        </div>
-                      </div>
+                              <div className="border-r border-slate-100 pr-4">
+                                <span className="block text-[11px] font-bold text-slate-500 mb-1">Total Unit</span>
+                                <span className="text-lg font-bold text-slate-900 leading-none">{cust.total_purchased || 0} <span className="text-[10px] text-slate-400 font-bold">U</span></span>
+                              </div>
+
+                              <div className="border-r border-slate-100 pr-4">
+                                <span className="block text-[11px] font-bold text-slate-500 mb-1">Orders</span>
+                                <span className="text-sm font-bold text-slate-700">{orderEvents.length || orderDates.length} total</span>
+                                <p className="text-[11px] font-semibold text-slate-500 mt-1">Latest: {latestOrderDate}</p>
+                              </div>
+
+                              <div className="pl-2">
+                                <span className="block text-[11px] font-bold text-emerald-700 mb-1">Delivery Date</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                  <span className="text-sm font-bold text-slate-900">{latestDeliveryDate}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="rounded-xl bg-white border border-slate-100 p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Order & Delivery Timeline</span>
+                                <span className="text-[10px] font-bold text-slate-400">{orderEvents.length || orderDates.length} records</span>
+                              </div>
+
+                              {orderEvents.length === 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-slate-600">
+                                  {orderDates.map((dateValue, idx2) => (
+                                    <div key={`timeline-fallback-${idx2}`} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
+                                      <p className="font-bold text-slate-700">Order: {dateValue}</p>
+                                      <p className="text-slate-500">Delivery: {deliveryDates[idx2] || latestDeliveryDate}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="max-h-36 overflow-y-auto pr-1 space-y-2">
+                                  {orderEvents.map((evt, idx2) => (
+                                    <div key={`timeline-${idx2}`} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="text-[11px] font-bold text-slate-700">Order: {evt.order_date || 'Unknown'}</p>
+                                        <p className="text-[11px] font-bold text-slate-900">{toUnitsSafe(evt.units)} U</p>
+                                      </div>
+                                      <p className="text-[11px] text-slate-500 mt-0.5">Delivery: {evt.delivery_date || 'Not Scheduled'}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between pt-1">
+                              <div className="flex items-center gap-3">
+                                <div className="px-3 py-1 rounded-full bg-slate-50 border border-slate-200 flex items-center gap-2">
+                                  <BrainCircuit size={10} className="text-slate-400" />
+                                  <span className={`text-[10px] font-bold ${cust.trend_tag?.includes('Drop') ? 'text-rose-500' : (cust.trend_tag?.includes('Increasing') ? 'text-emerald-600' : 'text-slate-500')
+                                    }`}>
+                                    Trend: {cust.trend_tag}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 text-slate-400 font-bold text-[10px] px-3 py-1.5 rounded-lg border border-slate-100 bg-slate-50">
+                                <Truck size={12} />
+                                Auto-Schedule
+                              </div>
+                            </div>
                           </>
                         );
                       })()}
@@ -752,3 +645,4 @@ const InventoryRisks = () => {
 };
 
 export default InventoryRisks;
+
