@@ -269,7 +269,25 @@ const normalizeAnalysisPayload = (payload) => {
     ? incomingCustomers
     : (customerAnalysis.length ? buildCustomersFromCustomerAnalysis(customerAnalysis) : customerFallback);
 
-  const stockAnalysis = inventoryModel.stock_analysis;
+  const hasAnyRiskKeys = (obj = {}, keys = []) => keys.some((key) => Object.prototype.hasOwnProperty.call(obj, key));
+  const toNumSafe = (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const hasSignal = (obj = {}, keys = []) => keys.reduce((sum, key) => sum + toNumSafe(obj?.[key]), 0) > 0;
+
+  const payloadStockAnalysis = payload.stock_analysis && typeof payload.stock_analysis === 'object'
+    ? payload.stock_analysis
+    : null;
+  const payloadSummary = payload.summary && typeof payload.summary === 'object'
+    ? payload.summary
+    : null;
+
+  const stockAnalysis = (payloadStockAnalysis && hasAnyRiskKeys(payloadStockAnalysis, [
+    'out_of_stock_items', 'low_stock_items', 'deadstock_items', 'overstock_items', 'healthy_items',
+  ]))
+    ? payloadStockAnalysis
+    : inventoryModel.stock_analysis;
 
   const inventorySummary = {
     ...(payload.inventory_summary || {}),
@@ -304,7 +322,7 @@ const normalizeAnalysisPayload = (payload) => {
     _inventory_validation: inventoryModel.validation,
     _inventory_threshold: inventoryModel.low_stock_threshold,
     products_analysis: productsAnalysis,
-    products,
+    products: Array.isArray(payload.products) && payload.products.length > 0 ? payload.products : products,
     customer_analysis: customerAnalysis,
     customers,
     stock_analysis: stockAnalysis,
@@ -322,9 +340,14 @@ const normalizeAnalysisPayload = (payload) => {
       total_sales: payload.sales_summary?.total_sales ?? inventorySummary.total_sales,
       trend: payload.sales_summary?.trend || payload.forecast_summary?.daily_pattern || 'Stable',
     },
-    summary: {
-      ...inventoryModel.summary,
-    },
+    summary: (payloadSummary && (
+      hasAnyRiskKeys(payloadSummary, ['out_of_stock', 'low_stock', 'deadstock', 'overstock', 'healthy'])
+      || hasSignal(payloadSummary, ['out_of_stock', 'low_stock', 'deadstock', 'overstock', 'healthy'])
+    ))
+      ? payloadSummary
+      : {
+        ...inventoryModel.summary,
+      },
     recommendations,
     past_sales_daily: Array.isArray(payload.past_sales_daily) ? payload.past_sales_daily : [],
     past_sales_weekly: Array.isArray(payload.past_sales_weekly) ? payload.past_sales_weekly : [],
@@ -335,6 +358,28 @@ const normalizeAnalysisPayload = (payload) => {
 };
 
 export const AnalysisProvider = ({ children }) => {
+  const resolveStoredAnalysisUploadId = () => {
+    try {
+      const raw = localStorage.getItem(LAST_ANALYSIS_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const direct = Number(
+        parsed?.analysis_isolation?.sheet_id
+        || parsed?.analysis_isolation?.upload_id
+        || parsed?.metadata?.upload_id
+        || 0
+      );
+      if (Number.isFinite(direct) && direct > 0) return direct;
+      const sessionId = String(parsed?.analysis_isolation?.session_id || '');
+      const match = sessionId.match(/upload-(\d+)/i);
+      if (!match) return null;
+      const bySession = Number(match[1]);
+      return Number.isFinite(bySession) && bySession > 0 ? bySession : null;
+    } catch {
+      return null;
+    }
+  };
+
   const [analysis, setAnalysisState] = useState(() => {
     try {
       const raw = localStorage.getItem(LAST_ANALYSIS_STORAGE_KEY);
@@ -346,10 +391,16 @@ export const AnalysisProvider = ({ children }) => {
     }
   });
   const [latestMeta, setLatestMeta] = useState({ uploadId: null, status: null });
+  const [syncState, setSyncState] = useState(() => ({
+    status: 'BOOTING', // BOOTING | NO_AUTH | CONNECTED | DEGRADED
+    lastSuccessAt: null,
+    lastErrorAt: null,
+  }));
   const [selectedUploadId, setSelectedUploadId] = useState(() => {
     const raw = localStorage.getItem('ai-ops-selected-upload-id');
     const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    return resolveStoredAnalysisUploadId();
   });
   const latestMetaRef = useRef({ uploadId: null, status: null });
   const analysisRef = useRef(null);
@@ -414,12 +465,22 @@ export const AnalysisProvider = ({ children }) => {
         const token = localStorage.getItem('access_token');
         if (!token) {
           nextDelayMs = 30000;
+          setSyncState((prev) => ({
+            ...prev,
+            status: 'NO_AUTH',
+            lastErrorAt: prev.lastErrorAt || Date.now(),
+          }));
           return;
         }
         const endpoint = selectedUploadId
           ? `/ingestion/upload-analysis/${selectedUploadId}/`
           : '/ingestion/latest-analysis/';
         const res = await api.get(endpoint, { timeout: ANALYSIS_POLL_TIMEOUT_MS });
+        setSyncState((prev) => ({
+          ...prev,
+          status: 'CONNECTED',
+          lastSuccessAt: Date.now(),
+        }));
         const nextId = res.data?.upload_id ?? null;
         const nextStatus = res.data?.status ?? null;
         const lockActive = !selectedUploadId && Date.now() < manualLockUntilRef.current;
@@ -513,6 +574,11 @@ export const AnalysisProvider = ({ children }) => {
           localStorage.removeItem('ai-ops-selected-upload-id');
           setSelectedUploadId(null);
         }
+        setSyncState((prev) => ({
+          ...prev,
+          status: localStorage.getItem('access_token') ? 'DEGRADED' : 'NO_AUTH',
+          lastErrorAt: Date.now(),
+        }));
         // Ignore polling errors; UI will use last known analysis.
         nextDelayMs = 20000;
       } finally {
@@ -572,6 +638,7 @@ export const AnalysisProvider = ({ children }) => {
     selectedUploadId,
     pinUploadAnalysis,
     clearPinnedUploadAnalysis,
+    syncState,
   }), [analysis, latestMeta, selectedUploadId]);
 
   return (

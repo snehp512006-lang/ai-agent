@@ -9,6 +9,7 @@ urlpatterns = [
     path('latest-analysis/', views.LatestAnalysisView.as_view(), name='latest-analysis'),
     path('upload-analysis/<int:upload_id>/', views.UploadAnalysisView.as_view(), name='upload-analysis'),
     path('upload-sheet-preview/<int:upload_id>/', views.UploadSheetPreviewView.as_view(), name='upload-sheet-preview'),
+    path('upload-ledger-risk-summary/<int:upload_id>/', views.UploadLedgerRiskSummaryView.as_view(), name='upload-ledger-risk-summary'),
     path('debug-uploads/', views.DebugUploadsView.as_view(), name='debug-uploads'),
     path('simple-count/', views.SimpleCountView.as_view(), name='simple-count'),
     path('sheets/', views.SheetListCreateView.as_view(), name='sheet-list-create'),

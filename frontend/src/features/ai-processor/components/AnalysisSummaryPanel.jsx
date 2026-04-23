@@ -2,8 +2,19 @@ import React from 'react';
 import { CheckCircle2, AlertCircle, Sparkles, Database, ArrowRight, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-const AnalysisSummaryPanel = ({ hybridResult, analysisCards, rankedAlerts, onCommit, onResetToIdle }) => {
+const AnalysisSummaryPanel = ({
+  hybridResult,
+  analysisCards,
+  rankedAlerts,
+  isLockedSnapshotActive = false,
+  onCommit,
+  onResetToIdle,
+}) => {
   if (!hybridResult) return null;
+  const parsedSalesTotal = Number(analysisCards?.salesTotal);
+  const formattedSalesTotal = Number.isFinite(parsedSalesTotal)
+    ? new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(parsedSalesTotal)
+    : String(analysisCards?.salesTotal ?? 0);
 
   return (
     <motion.div
@@ -33,6 +44,14 @@ const AnalysisSummaryPanel = ({ hybridResult, analysisCards, rankedAlerts, onCom
               </div>
               <div className="w-1 h-1 rounded-full bg-slate-700" />
               <div className="text-xs font-bold text-slate-400">Pipeline: 11-Phase COO Engine</div>
+              {isLockedSnapshotActive && (
+                <>
+                  <div className="w-1 h-1 rounded-full bg-slate-700" />
+                  <div className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
+                    Locked Snapshot
+                  </div>
+                </>
+              )}
             </div>
 
             {hybridResult.metadata?.ingestion_report?.length > 0 && (
@@ -109,7 +128,7 @@ const AnalysisSummaryPanel = ({ hybridResult, analysisCards, rankedAlerts, onCom
               <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Sales Overview</div>
             </div>
             <div className="space-y-1">
-              <div className="text-[42px] leading-tight font-black text-white tabular-nums tracking-tighter">{String(analysisCards.salesTotal)}</div>
+              <div className="text-[42px] leading-tight font-black text-white tabular-nums tracking-tighter">{formattedSalesTotal}</div>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-slate-500 font-bold uppercase tracking-widest">Trend Analysis:</span>
                 <span className="text-[11px] text-blue-400 font-black uppercase tracking-widest font-mono">{String(analysisCards.salesTrend)}</span>

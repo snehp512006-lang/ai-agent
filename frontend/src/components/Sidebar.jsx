@@ -13,7 +13,6 @@ import {
   BarChart3,
   Factory,
   FileSpreadsheet,
-  Mail,
   Zap,
   Menu,
   ChevronLeft,
@@ -27,7 +26,6 @@ const navSections = [
     label: 'Main Tools',
     items: [
       { title: 'Business Home', icon: LayoutDashboard, path: '/' },
-      { title: 'Email Assistant', icon: Mail, path: '/email' },
       { title: 'Stock Alerts', icon: AlertTriangle, path: '/risks' },
       { title: 'Sales Forecast', icon: BarChart3, path: '/forecast' },
       { title: 'Client Records', icon: ListChecks, path: '/clients' },

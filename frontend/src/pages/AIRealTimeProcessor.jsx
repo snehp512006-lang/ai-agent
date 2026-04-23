@@ -17,6 +17,8 @@ import {
   buildAnalysisFromSummary,
   tagAnalysisWithSession,
   getPhaseFromProgress,
+  deriveUnifiedRiskCounts,
+  deriveSalesTotalFromAnalysis,
 } from '../features/ai-processor/utils/analysisHelpers';
 import {
   buildCsvString,
@@ -29,23 +31,64 @@ import {
   getDynamicStatusText,
 } from '../features/ai-processor/process/analysisSteps';
 
+const PROCESSOR_LOCKED_ANALYSIS_KEY = 'ai-ops-processor-locked-analysis';
+const hasMeaningfulAnalysisSnapshot = (analysisPayload) => {
+  if (!analysisPayload || typeof analysisPayload !== 'object') return false;
+  const confidence = Number(analysisPayload?.confidence_score || 0);
+  const hasDiagnostics = Array.isArray(analysisPayload?.metadata?.sheet_diagnostics) && analysisPayload.metadata.sheet_diagnostics.length > 0;
+  const hasIngestionReport = Array.isArray(analysisPayload?.metadata?.ingestion_report) && analysisPayload.metadata.ingestion_report.length > 0;
+  const hasRecommendations = Array.isArray(analysisPayload?.recommendations) && analysisPayload.recommendations.length > 0;
+  const hasAlerts = Array.isArray(analysisPayload?.alerts) && analysisPayload.alerts.length > 0;
+  const salesTotal = deriveSalesTotalFromAnalysis(analysisPayload, []);
+  return confidence > 0 && (hasDiagnostics || hasIngestionReport || hasRecommendations || hasAlerts || salesTotal > 0);
+};
+
+const readLockedProcessorAnalysis = () => {
+  try {
+    const raw = localStorage.getItem(PROCESSOR_LOCKED_ANALYSIS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return hasMeaningfulAnalysisSnapshot(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const resolveAnalysisUploadId = (analysisPayload) => {
+  const parsed = Number(
+    analysisPayload?.analysis_isolation?.sheet_id
+    || analysisPayload?.analysis_isolation?.upload_id
+    || analysisPayload?.metadata?.upload_id
+    || 0
+  );
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
 const AIRealTimeProcessor = () => {
-  const { setAnalysis, pinUploadAnalysis, clearPinnedUploadAnalysis } = useAnalysis();
+  const {
+    analysis: sharedAnalysis,
+    setAnalysis,
+    pinUploadAnalysis,
+    clearPinnedUploadAnalysis,
+  } = useAnalysis();
   const { theme } = useTheme();
   const { isLayoutFullscreen, toggleFullscreen } = useLayoutFullscreen();
   const isLight = theme === 'light';
   const skipProcessingAnimation = false;
+  const bootLockedAnalysis = useMemo(() => readLockedProcessorAnalysis(), []);
   const [file, setFile] = useState(null);
-  const [uploadId, setUploadId] = useState(null);
+  const [uploadId, setUploadId] = useState(() => resolveAnalysisUploadId(bootLockedAnalysis));
   const [data, setData] = useState([]);
   const [columns, setColumns] = useState([]);
-  const [status, setStatus] = useState('IDLE'); // IDLE, UPLOADING, READY, PROCESSING, COMPLETED
+  const [status, setStatus] = useState(() => (bootLockedAnalysis ? 'READY' : 'IDLE')); // IDLE, UPLOADING, READY, PROCESSING, COMPLETED
   const [processingIdx, setProcessingIdx] = useState(null);
   const [progressPct, setProgressPct] = useState(0);
   const [logs, setLogs] = useState([]);
-  const [hybridResult, setHybridResult] = useState(null);
+  const [hybridResult, setHybridResult] = useState(() => bootLockedAnalysis);
   const [showResultSlide, setShowResultSlide] = useState(false);
   const [isNeuralCooldown, setIsNeuralCooldown] = useState(false);
+  const [isLockedSnapshotActive, setIsLockedSnapshotActive] = useState(() => Boolean(bootLockedAnalysis));
   const [phaseLabel, setPhaseLabel] = useState('Data Cleaning');
   const [phaseMessage, setPhaseMessage] = useState('Crunching data vectors...');
   const [telemetry, setTelemetry] = useState({
@@ -73,7 +116,11 @@ const AIRealTimeProcessor = () => {
   const [sheetPreviewTotalRows, setSheetPreviewTotalRows] = useState(null);
   const [sheetPreviewRowsLoading, setSheetPreviewRowsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [stats, setStats] = useState({ anomalies: 0, cleaned: 0, predictions: 0, verified: 0 });
+  const [stats, setStats] = useState(() => (
+    bootLockedAnalysis
+      ? deriveStatsFromAnalysis(bootLockedAnalysis)
+      : { anomalies: 0, cleaned: 0, predictions: 0, verified: 0 }
+  ));
   const fileInputRef = useRef(null);
   const newSheetInputRef = useRef(null);
   const eventSourceRef = useRef(null);
@@ -113,6 +160,28 @@ const AIRealTimeProcessor = () => {
       return null;
     }
   };
+
+  const getAnalysisSessionKey = (analysisPayload) => {
+    if (!analysisPayload || typeof analysisPayload !== 'object') return 'none';
+    const isolation = analysisPayload.analysis_isolation || {};
+    return String(
+      isolation.session_id
+      || isolation.sheet_id
+      || isolation.upload_id
+      || analysisPayload.metadata?.upload_id
+      || 'none'
+    );
+  };
+
+  useEffect(() => {
+    if (!bootLockedAnalysis) return;
+    const lockedUploadId = resolveAnalysisUploadId(bootLockedAnalysis);
+    if (lockedUploadId) {
+      pinUploadAnalysis(lockedUploadId);
+    }
+    setAnalysis(bootLockedAnalysis);
+    setIsLockedSnapshotActive(true);
+  }, [bootLockedAnalysis, pinUploadAnalysis, setAnalysis]);
 
   const checkDuplicateUpload = async (selectedFile) => {
     const fileHash = await computeFileHash(selectedFile);
@@ -202,6 +271,17 @@ const AIRealTimeProcessor = () => {
     setShowCompletionHold(true);
     setIsReanalysisMode(false);
     setError(null);
+    try {
+      if (hasMeaningfulAnalysisSnapshot(taggedAnalysis)) {
+        localStorage.setItem(PROCESSOR_LOCKED_ANALYSIS_KEY, JSON.stringify(taggedAnalysis));
+        setIsLockedSnapshotActive(true);
+      } else {
+        localStorage.removeItem(PROCESSOR_LOCKED_ANALYSIS_KEY);
+        setIsLockedSnapshotActive(false);
+      }
+    } catch {
+      // no-op
+    }
 
     clearCompletionTransitionTimeout();
     completionTransitionTimeoutRef.current = setTimeout(() => {
@@ -212,6 +292,27 @@ const AIRealTimeProcessor = () => {
       completionTransitionTimeoutRef.current = null;
     }, 900);
   };
+
+  useEffect(() => {
+    if (hybridResult || status !== 'IDLE') return;
+    try {
+      const raw = localStorage.getItem(PROCESSOR_LOCKED_ANALYSIS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return;
+      const resolvedUploadId = resolveAnalysisUploadId(parsed);
+      setHybridResult(parsed);
+      setStats(deriveStatsFromAnalysis(parsed));
+      setStatus('READY');
+      setIsLockedSnapshotActive(true);
+      if (resolvedUploadId) {
+        setUploadId(resolvedUploadId);
+        pinUploadAnalysis(resolvedUploadId);
+      }
+    } catch {
+      // no-op
+    }
+  }, [hybridResult, status, pinUploadAnalysis]);
 
   const finalizeSimulation = (update, summary = {}) => {
     const mergedAnalysis = {
@@ -244,6 +345,12 @@ const AIRealTimeProcessor = () => {
     setIsReanalysisMode(false);
     setError(null);
     setAnalysis(null);
+    try {
+      localStorage.removeItem(PROCESSOR_LOCKED_ANALYSIS_KEY);
+      setIsLockedSnapshotActive(false);
+    } catch {
+      // no-op
+    }
     // Starting a brand-new analysis should not stay locked to an older pinned upload.
     clearPinnedUploadAnalysis();
 
@@ -479,6 +586,12 @@ const AIRealTimeProcessor = () => {
     setError(null);
     setAnalysis(null);
     clearPinnedUploadAnalysis();
+    try {
+      localStorage.removeItem(PROCESSOR_LOCKED_ANALYSIS_KEY);
+      setIsLockedSnapshotActive(false);
+    } catch {
+      // no-op
+    }
     backendRowsRef.current = [];
     latestSummaryRef.current = {};
     totalRowsRef.current = 0;
@@ -879,14 +992,12 @@ const AIRealTimeProcessor = () => {
     const stock = analysis.stock_analysis || {};
     const products = Array.isArray(analysis.products) ? analysis.products : [];
     const productsAnalysis = Array.isArray(analysis.products_analysis) ? analysis.products_analysis : [];
-    const sourceRows = productsAnalysis.length ? productsAnalysis : products;
+    // Merge both sources so cached/reference payloads can still recover sales from products.
+    const sourceRows = productsAnalysis.length ? [...productsAnalysis, ...products] : products;
     const forecast = Array.isArray(analysis.demand_forecast) ? analysis.demand_forecast : [];
     const schemaStatus = String(analysis.schema_status || '').toUpperCase();
 
-    const numericSalesTotal = Number(analysis.sales_summary?.total_sales);
-    const salesTotal = Number.isFinite(numericSalesTotal)
-      ? numericSalesTotal
-      : (analysis.sales_summary?.total_sales || 0);
+    const salesTotal = deriveSalesTotalFromAnalysis(analysis, sourceRows);
 
     const salesTrend = analysis.sales_summary?.trend && analysis.sales_summary?.trend !== 'Data not available'
       ? analysis.sales_summary.trend
@@ -914,39 +1025,7 @@ const AIRealTimeProcessor = () => {
       }
     }
 
-    const summaryCounts = {
-      lowStock: Number(analysis?.summary?.low_stock || 0),
-      outOfStock: Number(analysis?.summary?.out_of_stock || 0),
-      overStock: Number(analysis?.summary?.overstock || 0),
-      deadstockCount: Number(analysis?.summary?.deadstock || 0),
-      healthy: Number(analysis?.summary?.healthy || 0),
-      needsReview: 0,
-    };
-
-    const stockCounts = {
-      lowStock: Number(stock.low_stock_items || 0),
-      outOfStock: Number(stock.out_of_stock_items || 0),
-      overStock: Number(stock.overstock_items || 0),
-      deadstockCount: Number(stock.deadstock_items || 0),
-      healthy: Number(stock.healthy_items || 0),
-      needsReview: Number(stock.needs_review_items || 0),
-    };
-
-    const stockHasSignal = Object.values(stockCounts).reduce((sum, v) => sum + Number(v || 0), 0) > 0;
-    const summaryHasSignal = Object.values(summaryCounts).reduce((sum, v) => sum + Number(v || 0), 0) > 0;
-
-    const analysisCounts = stockHasSignal
-      ? stockCounts
-      : summaryHasSignal
-        ? summaryCounts
-        : {
-          lowStock: 0,
-          outOfStock: 0,
-          overStock: 0,
-          healthy: 0,
-          deadstockCount: 0,
-          needsReview: 0,
-        };
+    const analysisCounts = deriveUnifiedRiskCounts(analysis, 10);
 
     const totalProducts = Number(
       analysis?.inventory_summary?.total_products
@@ -1335,6 +1414,60 @@ const AIRealTimeProcessor = () => {
     setStats(deriveStatsFromAnalysis(hybridResult));
   }, [hybridResult]);
 
+  useEffect(() => {
+    if (!sharedAnalysis || typeof sharedAnalysis !== 'object') return;
+    if (!hasMeaningfulAnalysisSnapshot(sharedAnalysis)) {
+      // Ignore weak/stale payloads that create fake cards on refresh/reference.
+      return;
+    }
+    // Master stability rule:
+    // Once processor has a finalized/local snapshot, do not let background context polling
+    // rewrite cards on refresh/reference. This keeps values 100% stable for the locked upload.
+    if (
+      hybridResult
+      && ['READY', 'COMPLETED', 'HALTED'].includes(String(status || '').toUpperCase())
+    ) {
+      return;
+    }
+
+    const sharedSession = getAnalysisSessionKey(sharedAnalysis);
+    const localSession = getAnalysisSessionKey(hybridResult);
+    const sharedUploadId = Number(
+      sharedAnalysis?.analysis_isolation?.sheet_id
+      || sharedAnalysis?.analysis_isolation?.upload_id
+      || sharedAnalysis?.metadata?.upload_id
+      || 0
+    );
+    const localUploadId = Number(
+      uploadId
+      || hybridResult?.analysis_isolation?.sheet_id
+      || hybridResult?.analysis_isolation?.upload_id
+      || hybridResult?.metadata?.upload_id
+      || 0
+    );
+
+    // Hard lock: once this page is bound to an upload, ignore context updates from other uploads.
+    if (
+      Number.isFinite(localUploadId)
+      && localUploadId > 0
+      && Number.isFinite(sharedUploadId)
+      && sharedUploadId > 0
+      && sharedUploadId !== localUploadId
+    ) {
+      return;
+    }
+
+    if (!hybridResult || sharedSession !== localSession) {
+      setHybridResult(sharedAnalysis);
+      const resolvedUploadId = sharedUploadId;
+      if (Number.isFinite(resolvedUploadId) && resolvedUploadId > 0) {
+        setUploadId(resolvedUploadId);
+        // Keep processor state stable across refresh/reference by pinning the same upload.
+        pinUploadAnalysis(resolvedUploadId);
+      }
+    }
+  }, [sharedAnalysis, hybridResult, uploadId, pinUploadAnalysis, status]);
+
   const exportCSV = () => {
     console.log("Initializing Export...", { dataLength: data?.length, columns });
     if (!data || data.length === 0) {
@@ -1380,6 +1513,7 @@ const AIRealTimeProcessor = () => {
         hybridResult={hybridResult}
         analysisCards={analysisCards}
         rankedAlerts={rankedAlerts}
+        isLockedSnapshotActive={isLockedSnapshotActive}
         onCommit={handleCommit}
         onResetToIdle={resetToIdle}
       />

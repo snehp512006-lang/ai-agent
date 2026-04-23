@@ -925,6 +925,134 @@ class UploadSheetPreviewView(APIView):
             return Response({'error': 'Upload sheet preview failed', 'detail': str(exc)}, status=500)
 
 
+class UploadLedgerRiskSummaryView(APIView):
+    """
+    Deterministic ledger risk summary (OUT/LOW/HEALTHY) computed from raw upload rows.
+
+    This endpoint exists to keep frontend stats stable and prevent drift between
+    different analysis snapshots (e.g., check-quantity vs ledger movement).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, upload_id):
+        try:
+            sheet_name = str(request.query_params.get('sheet_name') or '').strip() or None
+
+            upload = DataCleanerRun.objects.filter(id=upload_id).only(
+                'id',
+                'uploaded_by_id',
+                'uploaded_sheet_name',
+                'analysis_status',
+            ).first()
+            if not upload:
+                return Response({'error': 'Upload not found'}, status=404)
+            if not (request.user.is_superuser or request.user.is_staff) and upload.uploaded_by_id not in {request.user.id, None}:
+                return Response({'error': 'Upload not found'}, status=404)
+
+            payload_obj = getattr(upload, 'payload', None)
+            rows = payload_obj.raw_data if payload_obj and isinstance(payload_obj.raw_data, list) else []
+            if not rows:
+                return Response({'error': 'Data not available'}, status=404)
+
+            # Infer sheet_name from first row if not provided.
+            if not sheet_name:
+                for row in rows:
+                    if isinstance(row, dict):
+                        sheet_name = str(row.get('_sheet_name') or '').strip() or None
+                        if sheet_name:
+                            break
+
+            if not sheet_name:
+                return Response({'error': 'sheet_name is required'}, status=400)
+
+            def _to_num(value):
+                try:
+                    if value is None:
+                        return None
+                    if isinstance(value, str):
+                        raw = value.strip()
+                        if not raw or raw.lower() == 'nan':
+                            return None
+                        return float(raw)
+                    return float(value)
+                except (TypeError, ValueError):
+                    return None
+
+            def _norm_key(value):
+                return re.sub(r'[^a-z0-9]+', '', str(value or '').lower())
+
+            def _get(row, aliases):
+                alias = {_norm_key(a) for a in aliases}
+                for key, val in row.items():
+                    if _norm_key(key) in alias:
+                        if val is None:
+                            continue
+                        if isinstance(val, str) and (not val.strip() or val.strip().lower() == 'nan'):
+                            continue
+                        return val
+                return None
+
+            product_aliases = ['product', 'product_name', 'name', 'item']
+            direction_aliases = ['in/out', 'in_out', 'inout', 'type', 'movement']
+            qty_aliases = ['quantity', 'qty', 'units']
+
+            buckets = {}
+            for idx, row in enumerate(rows):
+                if not isinstance(row, dict):
+                    continue
+                if str(row.get('_sheet_name') or '').strip() != sheet_name:
+                    continue
+
+                product = str(_get(row, product_aliases) or '').strip()
+                if not product:
+                    continue
+
+                direction_raw = str(_get(row, direction_aliases) or '').strip().upper()
+                qty_raw = _to_num(_get(row, qty_aliases))
+                if qty_raw is None:
+                    continue
+                qty = abs(qty_raw)
+
+                if product not in buckets:
+                    buckets[product] = {'in': 0.0, 'out': 0.0, 'ret': 0.0}
+
+                if 'RETURN' in direction_raw or direction_raw == 'RET':
+                    buckets[product]['ret'] += qty
+                elif 'OUT' in direction_raw or 'SALE' in direction_raw or 'ISSUE' in direction_raw:
+                    buckets[product]['out'] += qty
+                elif 'IN' in direction_raw or 'PURCHASE' in direction_raw or 'RECEIPT' in direction_raw:
+                    buckets[product]['in'] += qty
+
+            threshold = 10.0
+            out_count = 0
+            low_count = 0
+            healthy_count = 0
+            for bucket in buckets.values():
+                net = bucket['in'] + bucket['ret'] - bucket['out']
+                if net <= 0:
+                    out_count += 1
+                elif net < threshold:
+                    low_count += 1
+                else:
+                    healthy_count += 1
+
+            return Response({
+                'upload_id': upload.id,
+                'sheet_name': sheet_name,
+                'total_products': len(buckets),
+                'threshold': threshold,
+                'out_of_stock': out_count,
+                'low_stock': low_count,
+                'healthy': healthy_count,
+                'deadstock': 0,
+                'overstock': 0,
+            })
+        except Exception as exc:
+            logger.exception('Upload ledger risk summary failed for upload %s: %s', upload_id, exc)
+            return Response({'error': 'Upload ledger risk summary failed', 'detail': str(exc)}, status=500)
+
+
 class SheetListCreateView(generics.ListCreateAPIView):
     serializer_class = SheetSerializer
     permission_classes = [IsAuthenticated]

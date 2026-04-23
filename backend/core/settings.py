@@ -56,7 +56,6 @@ INSTALLED_APPS = [
     'inventory',
     'ai_engine',
     'ingestion',
-    'email_agent',
     'production',
 ]
 

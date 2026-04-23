@@ -1,5 +1,23 @@
 import { buildInventoryFromTransactions } from '../../inventory-engine/buildInventoryFromTransactions';
 
+const toFiniteNumber = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const normalizeKey = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const pickNumberByAliases = (row, aliases = []) => {
+  if (!row || typeof row !== 'object') return null;
+  const aliasSet = new Set(aliases.map(normalizeKey));
+  for (const key of Object.keys(row)) {
+    if (!aliasSet.has(normalizeKey(key))) continue;
+    const num = toFiniteNumber(row[key]);
+    if (num !== null) return num;
+  }
+  return null;
+};
+
 export const normalizeRiskLabel = (value) => {
   const raw = String(value || '').toUpperCase().replace(/[_-]+/g, ' ').trim();
   if (!raw) return 'UNKNOWN';
@@ -51,6 +69,105 @@ export const deriveCanonicalRiskCountsFromRows = (rows = []) => {
     deadstockCount: 0,
     needsReview: 0,
   };
+};
+
+export const deriveUnifiedRiskCounts = (analysis = {}, threshold = 10) => {
+  const products = Array.isArray(analysis?.products) ? analysis.products : [];
+  if (products.length > 0) {
+    const computed = products.reduce((acc, product) => {
+      const stock = Number(product?.net_stock ?? product?.on_hand ?? product?.current_stock);
+      const value = Number.isFinite(stock) ? stock : 0;
+      if (value <= 0) acc.outOfStock += 1;
+      else if (value < threshold) acc.lowStock += 1;
+      else acc.healthy += 1;
+      return acc;
+    }, {
+      lowStock: 0,
+      outOfStock: 0,
+      overStock: 0,
+      healthy: 0,
+      deadstockCount: 0,
+      needsReview: 0,
+    });
+    return computed;
+  }
+
+  const stock = analysis?.stock_analysis || {};
+  const summary = analysis?.summary || {};
+  const stockHasSignal =
+    Number(stock.out_of_stock_items || 0)
+    + Number(stock.low_stock_items || 0)
+    + Number(stock.deadstock_items || 0)
+    + Number(stock.overstock_items || 0)
+    + Number(stock.healthy_items || 0) > 0;
+  if (stockHasSignal) {
+    return {
+      lowStock: Number(stock.low_stock_items || 0),
+      outOfStock: Number(stock.out_of_stock_items || 0),
+      overStock: Number(stock.overstock_items || 0),
+      healthy: Number(stock.healthy_items || 0),
+      deadstockCount: Number(stock.deadstock_items || 0),
+      needsReview: Number(stock.needs_review_items || 0),
+    };
+  }
+
+  return {
+    lowStock: Number(summary.low_stock || 0),
+    outOfStock: Number(summary.out_of_stock || 0),
+    overStock: Number(summary.overstock || 0),
+    healthy: Number(summary.healthy || 0),
+    deadstockCount: Number(summary.deadstock || 0),
+    needsReview: 0,
+  };
+};
+
+export const deriveSalesTotalFromAnalysis = (analysis = {}, sourceRows = []) => {
+  // Prefer canonical analysis totals, prioritizing revenue-like fields.
+  // This card is expected to stay aligned with final analysis output, not row count.
+  const candidates = [
+    analysis?.sales_summary?.total_revenue,
+    analysis?.inventory_summary?.total_revenue,
+    analysis?.summary?.total_revenue,
+    analysis?.sales_summary?.total_sales,
+    analysis?.inventory_summary?.total_sales,
+    analysis?.inventory_summary?.total_sales_units,
+    analysis?.inventory_summary?.total_out,
+    analysis?.summary?.total_out,
+    analysis?.summary?.total_sales,
+    analysis?.summary?.sales_total,
+    analysis?.summary?.total_sales_units,
+  ];
+  let zeroCandidate = null;
+  for (const val of candidates) {
+    const n = toFiniteNumber(val);
+    if (n === null) continue;
+    if (n > 0) return n;
+    if (zeroCandidate === null) zeroCandidate = 0;
+  }
+
+  // Fallback: sum any "sales/out" style quantities from rows
+  const SALES_QTY_ALIASES = [
+    'total_sales',
+    'total_sales_units',
+    'sales_qty',
+    'sold_qty',
+    'out_qty',
+    'total_out',
+    'quantity_sold',
+    'sale_quantity',
+  ];
+  let sum = 0;
+  let hit = 0;
+  (Array.isArray(sourceRows) ? sourceRows : []).forEach((row) => {
+    const v = pickNumberByAliases(row, SALES_QTY_ALIASES);
+    if (v === null) return;
+    if (v <= 0) return;
+    sum += v;
+    hit += 1;
+  });
+  if (hit > 0) return sum;
+
+  return zeroCandidate ?? 0;
 };
 
 export const buildAnalysisFromSummary = (summary = {}, rows = []) => {

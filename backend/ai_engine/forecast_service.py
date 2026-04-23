@@ -1,8 +1,5 @@
 import pandas as pd
 import numpy as np
-from prophet import Prophet
-from statsmodels.tsa.arima.model import ARIMA
-from sklearn.metrics import mean_absolute_error, mean_squared_error
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import timedelta
@@ -47,6 +44,7 @@ class AdvancedForecaster:
 
     def calculate_metrics(self, y_true, y_pred):
         """Calculate MAE, RMSE, and MAPE."""
+        from sklearn.metrics import mean_absolute_error, mean_squared_error
         mae = mean_absolute_error(y_true, y_pred)
         rmse = np.sqrt(mean_squared_error(y_true, y_pred))
         # Avoid division by zero for MAPE
@@ -63,6 +61,8 @@ class AdvancedForecaster:
         # Prophet requires columns 'ds' and 'y'
         prophet_df = train_df.rename(columns={self.date_col: 'ds', self.target_col: 'y'})
         
+        from prophet import Prophet
+
         model = Prophet(
             daily_seasonality=False,
             weekly_seasonality=True,
@@ -79,6 +79,7 @@ class AdvancedForecaster:
         """Train ARIMA model (Auto-Regressive Integrated Moving Average)."""
         series = train_df.set_index(self.date_col)[self.target_col]
         try:
+            from statsmodels.tsa.arima.model import ARIMA
             # Simple (5,1,0) configuration; in production, you might use auto_arima
             model = ARIMA(series, order=(5, 1, 0))
             model_fit = model.fit()

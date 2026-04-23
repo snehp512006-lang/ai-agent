@@ -875,6 +875,57 @@ const withTimeout = async (promise, timeoutMs = 5000) => {
   }
 };
 
+const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  year: 'numeric',
+});
+
+const aggregateMonthly = (rows, { valueKeys = [], mode = 'sum' } = {}) => {
+  if (!rows || rows.length === 0) return [];
+
+  const groups = new Map();
+
+  rows.forEach((row, idx) => {
+    const rawValue = row?.period || row?.name || row?.date;
+    const date = parseTimelineDate(rawValue, idx);
+    if (!date) return;
+
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    if (!groups.has(key)) {
+      const monthDate = new Date(date.getFullYear(), date.getMonth(), 1);
+      groups.set(key, {
+        totals: Object.fromEntries(valueKeys.map((item) => [item, 0])),
+        count: 0,
+        label: MONTH_LABEL_FORMATTER.format(monthDate),
+        order: monthDate.getTime(),
+      });
+    }
+
+    const group = groups.get(key);
+    valueKeys.forEach((keyName) => {
+      const value = Number(row?.[keyName] ?? 0);
+      group.totals[keyName] += Number.isFinite(value) ? value : 0;
+    });
+    group.count += 1;
+  });
+
+  return Array.from(groups.values())
+    .sort((a, b) => a.order - b.order)
+    .map((group) => {
+      const aggregated = {};
+      valueKeys.forEach((keyName) => {
+        aggregated[keyName] = group.count
+          ? (mode === 'avg' ? group.totals[keyName] / group.count : group.totals[keyName])
+          : 0;
+      });
+
+      return {
+        period: group.label,
+        ...aggregated,
+      };
+    });
+};
+
 const isTimeoutError = (err) => String(err?.message || '').toLowerCase().includes('timeout');
 const DASHBOARD_FAST_TIMEOUT_MS = 8000;
 const DASHBOARD_FORECAST_TIMEOUT_MS = 10000;
@@ -1004,13 +1055,6 @@ const Dashboard = () => {
     }
   ], [latestMeta, analysis]);
 
-  // Dynamic time grouping based on horizon selection
-  const timeGrouping = useMemo(() => {
-    if (forecastMode === 'past') return 'weekly';
-    return 'daily'; 
-  }, [forecastMode]);
-
-  const weeklyAggregation = 'sum';
   const isAnalyzing = Boolean(latestMeta?.uploadId) &&
     (latestMeta?.status === 'UPLOADING' || latestMeta?.status === 'PROCESSING' || latestMeta?.status === 'ANALYZING');
 
@@ -1046,57 +1090,26 @@ const Dashboard = () => {
   }, [analysis, forecastMode, pastDailyData, pastWeeklyData]);
 
   const displayPastData = useMemo(() => {
-    // Zoom into recent past context based on future forecast duration for symmetry
-    const sliceCount = forecastHorizon === 'week' ? 7 : forecastHorizon === 'month' ? 30 : 52;
-
-    if (timeGrouping === 'daily') {
-      const data = pastDailyData.length ? pastDailyData : pastWeeklyData;
-      return sliceCount ? data.slice(-sliceCount) : data;
-    }
-
-    return (pastWeeklyData.length ? pastWeeklyData : aggregateWeekly(pastDailyData, {
+    const sliceCount = forecastHorizon === 'month' ? 6 : 12;
+    const sourceRows = pastDailyData.length ? pastDailyData : pastWeeklyData;
+    return aggregateMonthly(sourceRows, {
       valueKeys: ['actual'],
-      mode: weeklyAggregation,
-    })).slice(-sliceCount);
-  }, [timeGrouping, weeklyAggregation, pastDailyData, pastWeeklyData, forecastHorizon]);
+      mode: 'sum',
+    }).slice(-sliceCount);
+  }, [pastDailyData, pastWeeklyData, forecastHorizon]);
 
   const displayForecastData = useMemo(() => {
-    if (timeGrouping === 'daily') return forecastRawData;
-    return aggregateWeekly(forecastRawData, {
+    return aggregateMonthly(forecastRawData, {
       valueKeys: ['predicted', 'lower', 'upper', 'production'],
-      mode: weeklyAggregation,
+      mode: 'sum',
     });
-  }, [timeGrouping, weeklyAggregation, forecastRawData]);
+  }, [forecastRawData]);
 
   const displayForecastDataForHorizon = useMemo(() => {
     if (!Array.isArray(displayForecastData)) return [];
-    const baseDate = toStartOfDay(new Date());
-    const maxOffset = getHorizonWindowDays(forecastHorizon, baseDate) - 1;
-
-    const windowed = displayForecastData.filter((row, idx) => {
-      const offset = getFutureOffsetDays(row, idx, baseDate);
-      return Number.isFinite(offset) && offset >= 0 && offset <= maxOffset;
-    });
-
-    if (windowed.length > 0) {
-      if (timeGrouping === 'daily') {
-        if (forecastHorizon === 'week') {
-          return padDailyForecastWindow(windowed, 7, baseDate);
-        }
-        if (forecastHorizon === 'month') {
-          return padDailyForecastWindow(windowed, getHorizonWindowDays('month', baseDate), baseDate);
-        }
-        if (forecastHorizon === 'year') {
-          // Professional expectation: always provide full next-year continuity on chart.
-          return padDailyForecastWindow(windowed, 365, baseDate);
-        }
-      }
-      return windowed;
-    }
-
-    const fallbackLimit = getHorizonPointLimit(forecastHorizon, timeGrouping, baseDate);
-    return displayForecastData.slice(0, fallbackLimit);
-  }, [displayForecastData, forecastHorizon, timeGrouping]);
+    const sliceCount = forecastHorizon === 'month' ? 6 : 12;
+    return displayForecastData.slice(0, sliceCount);
+  }, [displayForecastData, forecastHorizon]);
 
   const salesModalTrendData = useMemo(() => {
     const pastRows = (displayPastData || []).slice(-24).map((row) => ({
@@ -1986,13 +1999,13 @@ const Dashboard = () => {
                         animate={{ opacity: 1, x: 0 }}
                         className="inline-flex items-center rounded-full p-1.5 bg-slate-100 dark:bg-white/10 border border-slate-200/60 dark:border-white/10 shadow-sm ml-2"
                       >
-                        {['week', 'month', 'year'].map((h) => (
+                        {['month', 'year'].map((h) => (
                           <button
                             key={h}
                             onClick={() => setForecastHorizon(h)}
                             className={`px-3 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all duration-200 ${forecastHorizon === h ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md' : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-white/10'}`}
                           >
-                            {h === 'year' ? 'Full Year' : h === 'month' ? 'Month' : 'Week'}
+                            {h === 'year' ? 'Year' : 'Month'}
                           </button>
                         ))}
                       </motion.div>

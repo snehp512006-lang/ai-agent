@@ -32,18 +32,13 @@ const InventoryRiskProductCard = ({
   const needsArrangeNow = hasOrderStock && totalOrderStock > 0;
   const pendingPickupQty = toFiniteNumber(prod.pending_party_pickup_qty) ?? 0;
   const deliveredQty = toFiniteNumber(prod.delivered_to_party_qty) ?? 0;
-  const totalInQty = toFiniteNumber(prod.total_in);
-  const totalReturnQty = toFiniteNumber(prod.total_return);
-  const hasOrderFormulaBreakup = totalInQty !== null || totalReturnQty !== null;
+  const totalOutQty = toFiniteNumber(prod.total_out_order_need);
+  const totalReturnQty = toFiniteNumber(prod.total_return_order_need);
+  const hasOrderFormulaBreakup = totalOutQty !== null || totalReturnQty !== null;
 
   let stockRequired = null;
-  if (onHandValue === 0 && hasOrderStock) {
-    stockRequired = totalOrderStock;
-  } else if (needsArrangeNow && hasOrderStock) {
-    stockRequired = totalOrderStock;
-  } else if (hasOrderStock && onHandValue !== null && toFiniteNumber(prod.reorder) !== null) {
-    const diff = toFiniteNumber(prod.reorder) - onHandValue;
-    stockRequired = diff > 0 ? diff : 0;
+  if (hasOrderStock && onHandValue !== null) {
+    stockRequired = Math.max(0, totalOrderStock - onHandValue);
   }
 
   const unitPrice = toFiniteNumber(prod.unit_price);
@@ -124,12 +119,9 @@ const InventoryRiskProductCard = ({
                 ? 'Arrange quantity required to fulfill current demand.'
                 : 'No immediate arrangement required.'}
             </p>
-            <p className="text-[10px] text-[var(--text-muted)] mt-1">
-              Qty(-) pending pickup: {formatUnitsValue(pendingPickupQty)} | Qty(+) delivered: {formatUnitsValue(deliveredQty)}
-            </p>
             {hasOrderFormulaBreakup && (
               <p className="text-[10px] text-[var(--text-muted)] mt-1">
-                Formula: Qty(IN) {formatUnitsValue(totalInQty ?? 0)} - Qty(RETURN) {formatUnitsValue(totalReturnQty ?? 0)}
+                Formula: Qty(OUT) {formatUnitsValue(totalOutQty ?? 0)} - Qty(RETURN) {formatUnitsValue(totalReturnQty ?? 0)}
               </p>
             )}
           </div>
@@ -137,7 +129,7 @@ const InventoryRiskProductCard = ({
 
         <div className={`mb-3 rounded-xl border p-2.5 ${tone.planWrap}`}>
           <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${tone.label}`}>What To Do Next</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className={`rounded-xl border p-2.5 ${tone.tile}`}>
               <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${tone.label}`}>{actionPlan.line1Label}</p>
               <p className={`text-sm font-bold ${tone.valuePrimary}`}>{compactDisplay(actionPlan.line1Value)}</p>
@@ -145,10 +137,6 @@ const InventoryRiskProductCard = ({
             <div className={`rounded-xl border p-2.5 ${tone.tile}`}>
               <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${tone.label}`}>Stock Required</p>
               <p className="text-sm font-bold text-rose-700">{stockRequired !== null ? `${formatUnitsValue(stockRequired)} units` : '-'}</p>
-            </div>
-            <div className={`rounded-xl border p-2.5 ${tone.tile}`}>
-              <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${tone.label}`}>{actionPlan.line3Label}</p>
-              <p className={`text-sm font-bold ${tone.valueTertiary}`}>{compactDisplay(actionPlan.line3Value)}</p>
             </div>
           </div>
         </div>

@@ -23,7 +23,6 @@ urlpatterns = [
     path('api/inventory/', include('inventory.urls')),
     path('api/ai/', include('ai_engine.urls')),
     path('api/ingestion/', include('ingestion.urls')),
-    path('api/email/', include('email_agent.urls')),
     path('api/production/', include('production.urls')),
     path('api/v1/coo/', include('ai_engine.urls')),
 ]

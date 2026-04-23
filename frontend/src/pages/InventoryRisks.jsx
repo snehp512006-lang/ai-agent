@@ -4,12 +4,13 @@ import {
   AlertCircle,
   CheckCircle2,
   Package,
+  LayoutGrid,
   TrendingDown,
   Loader2,
   ArrowRight,
-  ShieldAlert,
   Zap,
   TrendingUp,
+  Rows3,
   Search,
   Filter,
   History,
@@ -68,8 +69,10 @@ import {
 } from '../features/ai-processor/process/inventoryRisksCustomers';
 
 const InventoryRisks = () => {
-  const { analysis: liveAnalysis, selectedUploadId } = useAnalysis();
+  const { analysis: liveAnalysis, selectedUploadId, latestMeta } = useAnalysis();
   const [filter, setFilter] = useState('ALL');
+  const [viewMode, setViewMode] = useState('cards');
+  const [popupViewMode, setPopupViewMode] = useState('cards');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [priceMin, setPriceMin] = useState('');
@@ -85,7 +88,12 @@ const InventoryRisks = () => {
     remoteProductBuyers,
     remoteProductBuyersLoading,
     remoteBuyerSource,
-  } = useInventoryRisksData({ liveAnalysis, selectedUploadId, selectedProduct });
+  } = useInventoryRisksData({
+    liveAnalysis,
+    selectedUploadId,
+    selectedProduct,
+    latestUploadId: latestMeta?.uploadId,
+  });
 
   const filtered = products.filter((r) => {
     const quickRisk = filter === 'ALL' || r.risk === filter;
@@ -179,6 +187,110 @@ const InventoryRisks = () => {
     return text === 'INSUFFICIENT DATA' ? '-' : value;
   };
 
+  const getRiskPresentation = (prod) => {
+    const metrics = getProductMetrics(prod);
+    const riskKey = metrics.healthStatus === 'CRITICAL'
+      ? 'OUT_OF_STOCK'
+      : (metrics.healthStatus === 'LOW STOCK' ? 'LOW_STOCK' : (metrics.healthStatus === 'HEALTHY' ? 'HEALTHY' : normalizeRisk(prod?.risk)));
+
+    return {
+      riskKey,
+      config: RISK_CONFIG[riskKey] || RISK_CONFIG.HEALTHY,
+      tone: RISK_THEME[riskKey] || RISK_THEME.HEALTHY,
+      metrics,
+    };
+  };
+
+  const renderStatusBadge = (prod) => {
+    const { config } = getRiskPresentation(prod);
+    return (
+      <div className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 ${config.className}`}>
+        <config.icon size={13} />
+        <span className="text-[10px] font-black uppercase tracking-[0.18em]">{config.label}</span>
+      </div>
+    );
+  };
+
+  const openProductDetails = (prod, preferredMode = 'cards') => {
+    setPopupViewMode(preferredMode);
+    setSelectedProduct({ prod, actionPlan: getActionPlan(prod) });
+  };
+
+  const getCustomerPresentation = (cust) => {
+    const orderEvents = Array.isArray(cust?.order_events)
+      ? cust.order_events.filter((evt) => evt?.order_date || evt?.delivery_date)
+      : [];
+
+    let deliveryDates = orderEvents
+      .filter((evt) => evt.delivery_date)
+      .map((evt) => evt.delivery_date);
+
+    if (deliveryDates.length === 0) {
+      const outEvent = orderEvents.find((evt) => evt.order_date && (!evt.delivery_date || evt.delivery_date === evt.order_date));
+      if (outEvent) {
+        deliveryDates = [outEvent.order_date];
+      }
+    }
+
+    const orderDates = orderEvents
+      .filter((evt) => evt.order_date && (!evt.delivery_date || evt.delivery_date === ''))
+      .map((evt) => evt.order_date);
+
+    return {
+      orderEvents,
+      orderDates,
+      latestOrderDate: orderDates[0] || 'Unknown',
+      latestDeliveryDate: deliveryDates[0] || 'Not Scheduled',
+    };
+  };
+
+  const renderCustomerTableView = (customers) => (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="overflow-x-auto">
+        <table className="w-full table-fixed">
+          <thead>
+            <tr className="bg-slate-100 text-left">
+              {['Customer', 'Risk', 'Units', 'Orders', 'Last Order', 'Delivery', 'Trend'].map((label) => (
+                <th key={label} className="px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-700">
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {customers.map((cust, i) => {
+              const { orderEvents, orderDates, latestOrderDate, latestDeliveryDate } = getCustomerPresentation(cust);
+              const riskTone = cust.risk_level === 'Low'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : (cust.risk_level === 'Medium'
+                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                  : 'bg-rose-50 text-rose-700 border-rose-200');
+
+              return (
+                <tr key={`popup-table-${cust.customer_id || i}`} className="border-t border-slate-100 hover:bg-slate-50/80">
+                  <td className="px-3 py-3 align-top">
+                    <p className="text-[12px] font-black text-slate-900 break-words">{cust.name || 'Unknown Client'}</p>
+                    <p className="mt-1 text-[10px] font-semibold text-slate-500 break-words">{cust.company || 'Direct Buyer Partner'}</p>
+                  </td>
+                  <td className="px-3 py-3 align-top">
+                    <span className={`inline-flex rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] ${riskTone}`}>
+                      {cust.risk_level} Risk
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 align-top text-[12px] font-black text-slate-900">{toUnitsSafe(cust.total_purchased)} U</td>
+                  <td className="px-3 py-3 align-top text-[12px] font-bold text-slate-700">{orderEvents.length || orderDates.length}</td>
+                  <td className="px-3 py-3 align-top text-[11px] font-semibold text-slate-600 break-words">{latestOrderDate}</td>
+                  <td className="px-3 py-3 align-top text-[11px] font-semibold text-emerald-700 break-words">{latestDeliveryDate}</td>
+                  <td className="px-3 py-3 align-top text-[10px] font-bold text-slate-500 break-words">{cust.trend_tag || 'Stable'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
   const renderProductCard = (prod, keyPrefix = 'prod', idx = 0) => {
     const productKey = `${keyPrefix}-${prod?.id ?? idx}-${String(prod?.sku || prod?.name || idx)}`;
     return (
@@ -186,7 +298,7 @@ const InventoryRisks = () => {
         key={productKey}
         prod={prod}
         keyPrefix={keyPrefix}
-        setSelectedProduct={setSelectedProduct}
+        setSelectedProduct={(payload) => openProductDetails(payload.prod, 'cards')}
         getProductMetrics={getProductMetrics}
         getActionPlan={getActionPlan}
         compactDisplay={compactDisplay}
@@ -200,44 +312,252 @@ const InventoryRisks = () => {
     );
   };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center p-32 gap-6 bg-[var(--bg-accent)] rounded-[3rem] border border-[var(--border-subtle)]">
-        <div className="relative">
-          <div className="w-16 h-16 border-4 border-emerald-500/10 border-t-emerald-500 rounded-full animate-spin" />
-          <BrainCircuit className="absolute inset-0 m-auto text-emerald-500 animate-pulse" size={24} />
+  const renderTableView = (items) => (
+    <div className="overflow-hidden rounded-[1.8rem] border border-[var(--border-subtle)] bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+      <div className="flex flex-col gap-2 border-b border-slate-200 bg-gradient-to-r from-white via-emerald-50/40 to-slate-50 px-5 py-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-emerald-700">Inventory Table View</p>
         </div>
-        <p className="text-xs font-semibold tracking-wide text-emerald-500">Processing Data...</p>
+        <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">
+          {items.length} items visible
+        </div>
       </div>
-    );
-  }
+
+      <div className="overflow-x-hidden">
+        <table className="w-full table-fixed">
+          <thead>
+            <tr className="bg-slate-100 text-left">
+              {['Product Name', 'Stock Status', 'Available Qty', 'Order Qty', 'Need to Arrange', 'Stock Value', 'Days Left', 'Action'].map((label) => (
+                <th key={label} className="px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-700 border-b border-slate-200">
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((prod, idx) => {
+              const { metrics, tone } = getRiskPresentation(prod);
+              const unitPrice = toFiniteNumber(prod.unit_price);
+              const stockValue = toFiniteNumber(prod.stock_value);
+              const onHand = toFiniteNumber(prod.on_hand);
+              const orderStock = toFiniteNumber(prod.order_quantity);
+              const stockRequired = onHand !== null && orderStock !== null
+                ? Math.max(0, orderStock - onHand)
+                : null;
+              const displaySku = !isPlaceholderText(prod.sku) ? normalizeText(prod.sku) : 'No SKU';
+              const displayCategory = cleanCategoryLabel(prod.category, prod.name, prod.sku) || 'Uncategorized';
+              const daysLeft = typeof metrics.daysToStockout === 'number'
+                ? `${metrics.daysToStockout.toFixed(2)} days`
+                : compactDisplay(metrics.daysToStockout);
+
+              return (
+                <tr
+                  key={`table-row-${prod?.id ?? idx}-${displaySku}`}
+                  className="border-t border-slate-200 bg-white transition-colors hover:bg-emerald-50/40"
+                >
+                  <td className="px-3 py-4 align-top border-r border-slate-100 w-[17%]">
+                    <div className="flex items-start gap-2.5">
+                      <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-sm ${tone.tile}`}>
+                        <Package size={15} className="text-slate-700" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-black leading-5 text-slate-900 break-words">{prod.name}</p>
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 break-all">{displaySku}</p>
+                        <p className="mt-2 inline-flex max-w-full rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 truncate">{displayCategory}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-4 align-top border-r border-slate-100 w-[12%]">
+                    {renderStatusBadge(prod)}
+                  </td>
+                  <td className="px-3 py-4 align-top border-r border-slate-100 w-[12%]">
+                    <div className="rounded-xl bg-slate-50 px-3 py-2.5">
+                      <p className="text-2xl font-black leading-none text-slate-900">{onHand !== null ? formatUnitsValue(onHand) : '-'}</p>
+                      <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">In Stock</p>
+                    </div>
+                  </td>
+                  <td className="px-3 py-4 align-top border-r border-slate-100 w-[12%]">
+                    <div className="rounded-xl bg-blue-50 px-3 py-2.5">
+                      <p className="text-2xl font-black leading-none text-blue-700">{orderStock !== null ? formatUnitsValue(orderStock) : '-'}</p>
+                      <p className="mt-1.5 text-[10px] font-semibold text-blue-900/70">Order Qty</p>
+                    </div>
+                  </td>
+                  <td className="px-3 py-4 align-top border-r border-slate-100 w-[14%]">
+                    <div className={`rounded-xl px-3 py-2.5 ${stockRequired > 0 ? 'bg-rose-50' : 'bg-emerald-50'}`}>
+                      <p className={`text-2xl font-black leading-none ${stockRequired > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                        {stockRequired !== null ? formatUnitsValue(stockRequired) : '-'}
+                      </p>
+                      <p className={`mt-1.5 text-[10px] font-semibold leading-4 ${stockRequired > 0 ? 'text-rose-900/70' : 'text-emerald-900/70'}`}>
+                        {stockRequired > 0 ? 'Arrange now' : 'No extra stock'}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="px-3 py-4 align-top border-r border-slate-100 w-[14%]">
+                    <div className="rounded-xl bg-amber-50 px-3 py-2.5">
+                      <p className="text-[13px] font-black leading-5 text-slate-900 break-words">
+                        {unitPrice !== null && stockValue !== null ? formatCurrencyINR(stockValue) : 'Price Missing'}
+                      </p>
+                      <p className="mt-1.5 text-[10px] font-semibold leading-4 text-amber-900/70 break-words">
+                        {unitPrice !== null ? `${formatCurrencyINR(unitPrice, { maxDecimals: 2 })}/unit` : 'Price unavailable'}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="px-3 py-4 align-top border-r border-slate-100 w-[9%]">
+                    <div className="rounded-xl bg-violet-50 px-3 py-2.5">
+                      <p className="text-[13px] font-black leading-5 text-slate-900 break-words">{daysLeft}</p>
+                      <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-violet-900/70 break-words">{compactDisplay(metrics.healthStatus)}</p>
+                    </div>
+                  </td>
+                  <td className="px-3 py-4 align-top w-[10%]">
+                    <button
+                      onClick={() => openProductDetails(prod, 'table')}
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.12em] text-white transition-all hover:bg-emerald-600"
+                    >
+                      Details
+                      <ArrowRight size={12} />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="space-y-8 pb-20">
+    <div className="mx-auto flex w-full max-w-[1460px] flex-col gap-7 pb-16 pt-1 xl:gap-8">
+      {loading && (
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-2 w-fit">
+          <Loader2 size={13} className="animate-spin" />
+          Syncing latest analysis in background
+        </div>
+      )}
       {mappingError && (
         <div className="rounded-2xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-300">
           {mappingError}
         </div>
       )}
-      <div className="flex items-center justify-between mb-12">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 shadow-xl shadow-emerald-500/10">
-            <ShieldAlert className="text-emerald-500" size={32} />
-          </div>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-4xl font-black tracking-tighter text-white">Stock Alerts</h1>
-              <div className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Live</span>
+
+      {analysisReady ? (
+        <div className="sticky top-0 z-40 -mx-2 px-2 pb-3 pt-0 md:-mx-3 md:px-3 relative isolate">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 top-[-120vh] z-0 bg-[var(--bg-base)]" />
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 top-[-120vh] z-0 backdrop-blur-sm" />
+          <div className="relative z-10 rounded-[1.7rem] border border-[var(--border-subtle)] bg-gradient-to-r from-white via-[var(--bg-card)] to-[var(--bg-accent)] p-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+            <div className="mb-2 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-emerald-600">Search Workspace</p>
+              </div>
+              <div className="inline-flex w-fit items-center gap-1 rounded-[1.1rem] border border-slate-200 bg-white/90 p-1 shadow-[0_8px_20px_rgba(15,23,42,0.05)]">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('cards')}
+                  className={`inline-flex items-center gap-2 rounded-[0.9rem] px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition-all ${
+                    viewMode === 'cards'
+                      ? 'bg-emerald-500 text-white shadow-[0_10px_24px_rgba(16,185,129,0.24)]'
+                      : 'text-slate-500 hover:text-emerald-700'
+                  }`}
+                >
+                  <LayoutGrid size={14} />
+                  Card View
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('table')}
+                  className={`inline-flex items-center gap-2 rounded-[0.9rem] px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition-all ${
+                    viewMode === 'table'
+                      ? 'bg-slate-900 text-white shadow-[0_10px_24px_rgba(15,23,42,0.18)]'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <Rows3 size={14} />
+                  Table View
+                </button>
               </div>
             </div>
-            <p className="text-slate-500 text-sm font-medium mt-1">We are checking your stock risks.</p>
+
+            <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center">
+              <div className="relative min-w-0 xl:basis-[48%] xl:max-w-[50%]">
+                <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] transition-colors" size={17} />
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-emerald-500/8 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-emerald-600">
+                  Search
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search product, SKU, category, status..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-12 w-full rounded-[1.1rem] border border-slate-200 bg-white pl-11 pr-20 text-[14px] font-medium text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-all placeholder:text-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
+                />
+              </div>
+
+              <div className="flex min-w-0 flex-1 flex-col gap-2.5 lg:flex-row lg:items-center">
+                <div className="flex min-w-0 flex-1 flex-col gap-2.5 md:flex-row md:items-center">
+                  <div className="relative min-w-[190px] flex-1">
+                    <Filter className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={16} />
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="h-12 w-full appearance-none rounded-[1.1rem] border border-slate-200 bg-white pl-11 pr-10 text-[14px] font-semibold text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
+                    >
+                      <option value="ALL">All Status</option>
+                      <option value="OUT_OF_STOCK">Out of Stock</option>
+                      <option value="LOW_STOCK">Low Stock</option>
+                      <option value="DEADSTOCK">Deadstock</option>
+                      <option value="OVERSTOCK">Overstock</option>
+                      <option value="HEALTHY">Healthy</option>
+                    </select>
+                  </div>
+
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Min price"
+                      value={priceMin}
+                      onChange={(e) => setPriceMin(e.target.value)}
+                      className="h-12 min-w-0 flex-1 rounded-[1.1rem] border border-slate-200 bg-white px-4 text-[14px] font-medium text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                    <span className="shrink-0 text-[12px] font-black uppercase tracking-[0.18em] text-[var(--text-muted)]">to</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Max price"
+                      value={priceMax}
+                      onChange={(e) => setPriceMax(e.target.value)}
+                      className="h-12 min-w-0 flex-1 rounded-[1.1rem] border border-slate-200 bg-white px-4 text-[14px] font-medium text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 lg:justify-end">
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setStatusFilter('ALL');
+                      setPriceMin('');
+                      setPriceMax('');
+                      setFilter('ALL');
+                    }}
+                    className="h-12 rounded-[1.1rem] border border-emerald-100 bg-emerald-50 px-5 text-[13px] font-black uppercase tracking-[0.16em] text-emerald-700 transition-all hover:border-emerald-300 hover:bg-emerald-100"
+                  >
+                    Clear
+                  </button>
+
+                  <button className="flex h-12 w-12 items-center justify-center rounded-[1.1rem] border border-slate-200 bg-white text-[var(--text-muted)] transition-colors hover:border-emerald-300 hover:text-emerald-600">
+                    <History size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3 xl:grid-cols-5">
         {[
           { label: 'Out of Stock', count: riskStats.out_of_stock, icon: AlertCircle, color: '#ef4444', gradient: 'from-rose-500/20 to-transparent' },
           { label: 'Low Stock', count: riskStats.low_stock, icon: TrendingDown, color: '#f59e0b', gradient: 'from-amber-500/20 to-transparent' },
@@ -266,154 +586,64 @@ const InventoryRisks = () => {
 
       {analysisReady ? (
         <>
-          <div className="flex flex-col gap-3 pb-2">
-
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3">
-              <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-                <div className="relative group flex-1 min-w-[260px]">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-focus-within:text-emerald-500 transition-colors" size={15} />
-                  <input
-                    type="text"
-                    placeholder="Search product, SKU, category, status..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-xl pl-10 pr-4 py-2.5 text-xs text-[var(--text-main)] focus:outline-none focus:border-emerald-500/30 transition-all w-full"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 min-w-[180px]">
-                  <Filter size={15} className="text-[var(--text-muted)]" />
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-xl px-3 py-2.5 text-xs font-semibold text-[var(--text-main)] focus:outline-none focus:border-emerald-500/30"
-                  >
-                    <option value="ALL">All Status</option>
-                    <option value="OUT_OF_STOCK">Out of Stock</option>
-                    <option value="LOW_STOCK">Low Stock</option>
-                    <option value="DEADSTOCK">Deadstock</option>
-                    <option value="OVERSTOCK">Overstock</option>
-                    <option value="HEALTHY">Healthy</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-2 min-w-[250px]">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Min price"
-                    value={priceMin}
-                    onChange={(e) => setPriceMin(e.target.value)}
-                    className="w-full bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-xl px-3 py-2.5 text-xs text-[var(--text-main)] focus:outline-none focus:border-emerald-500/30"
-                  />
-                  <span className="text-[var(--text-muted)] text-xs font-bold">to</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Max price"
-                    value={priceMax}
-                    onChange={(e) => setPriceMax(e.target.value)}
-                    className="w-full bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-xl px-3 py-2.5 text-xs text-[var(--text-main)] focus:outline-none focus:border-emerald-500/30"
-                  />
-                </div>
-
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    setStatusFilter('ALL');
-                    setPriceMin('');
-                    setPriceMax('');
-                    setFilter('ALL');
-                  }}
-                  className="px-4 py-2.5 rounded-xl bg-[var(--bg-accent)] border border-[var(--border-subtle)] text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-main)] hover:border-emerald-500/30 transition-all"
-                >
-                  Clear
-                </button>
-
-                <button className="p-2.5 rounded-xl bg-[var(--bg-accent)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors">
-                  <History size={18} />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {variantGroups.length > 0 ? (
-            <div className="space-y-4">
-              <AnimatePresence mode="popLayout">
-                {variantGroups.map((group, groupIndex) => (
-                  <motion.div
-                    key={`variant-group-${group.familyKey}`}
-                    layout
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    transition={{ delay: groupIndex * 0.03 }}
-                    className="rounded-[1.6rem] border border-emerald-500/20 bg-white/70 p-4"
-                  >
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Variant Group</p>
-                        <h3 className="text-2xl font-black tracking-tight text-slate-900">{group.familyLabel}</h3>
-                      </div>
-                      <div className="px-3 py-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-[10px] font-black uppercase tracking-widest text-emerald-700 w-fit">
-                        {group.items.length} Types Together
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {Array.isArray(group.typeSignatures) && group.typeSignatures.length > 0 && (
-                        <div className="w-full flex flex-wrap gap-2 mb-1">
-                          {group.typeSignatures.map((sig) => (
-                            <span
-                              key={`type-sig-${group.familyKey}-${sig}`}
-                              className="px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-[10px] font-black uppercase tracking-wider text-emerald-700"
-                            >
-                              Type: {sig}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {group.items.map((item) => (
-                        <span
-                          key={`chip-${group.familyKey}-${item.id}`}
-                          className="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-600"
-                        >
-                          {item.name}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-3.5">
-                      {group.items.map((prod, idx) => renderProductCard(prod, `group-${group.familyKey}`, idx))}
-                    </div>
-                  </motion.div>
-                ))}
-
-                {singleVariantProducts.length > 0 && (
-                  <motion.div
-                    key="single-products"
-                    layout
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="space-y-3"
-                  >
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Other Products</p>
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-3.5">
-                      {singleVariantProducts.map((prod, idx) => renderProductCard(prod, 'single', idx))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+          {viewMode === 'table' ? (
+            renderTableView(filtered)
           ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3.5">
-              <AnimatePresence mode="popLayout">
-                {filtered.map((prod, idx) => renderProductCard(prod, 'default', idx))}
-              </AnimatePresence>
-            </div>
+            <>
+              {variantGroups.length > 0 ? (
+                <div className="space-y-4">
+                  <AnimatePresence mode="popLayout">
+                    {variantGroups.map((group, groupIndex) => (
+                      <motion.div
+                        key={`variant-group-${group.familyKey}`}
+                        layout
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        transition={{ delay: groupIndex * 0.03 }}
+                        className="rounded-[1.6rem] border border-emerald-500/20 bg-white/70 p-4"
+                      >
+                        <div className="flex flex-col gap-3 mb-3 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Variant Group</p>
+                            <h3 className="text-2xl font-black tracking-tight text-slate-900">{group.familyLabel}</h3>
+                          </div>
+                          <div className="w-fit rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-700">
+                            {group.items.length} Types Together
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-2">
+                          {group.items.map((prod, idx) => renderProductCard(prod, `group-${group.familyKey}`, idx))}
+                        </div>
+                      </motion.div>
+                    ))}
+
+                    {singleVariantProducts.length > 0 && (
+                      <motion.div
+                        key="single-products"
+                        layout
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="space-y-3"
+                      >
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Other Products</p>
+                        <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-2">
+                          {singleVariantProducts.map((prod, idx) => renderProductCard(prod, 'single', idx))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-2">
+                  <AnimatePresence mode="popLayout">
+                    {filtered.map((prod, idx) => renderProductCard(prod, 'default', idx))}
+                  </AnimatePresence>
+                </div>
+              )}
+            </>
           )}
 
           {filtered.length === 0 && (
@@ -433,7 +663,7 @@ const InventoryRisks = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 p-3 md:p-6"
             onClick={() => setSelectedProduct(null)}
           >
             <motion.div
@@ -446,32 +676,54 @@ const InventoryRisks = () => {
                 border: '1px solid #10b981',
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 15px rgba(16, 185, 129, 0.05)'
               }}
-              className="w-full max-w-lg rounded-[2rem] overflow-hidden relative"
+              className="relative w-full max-w-[1180px] max-h-[92vh] rounded-[2rem] overflow-hidden"
             >
               {/* Removed background gradient for simplicity */}
 
-              <div className="p-5 border-b border-emerald-100 flex items-center justify-between" style={{ background: '#f0fdf4' }}>
+              <div className="flex items-center justify-between gap-4 border-b border-emerald-100 p-5 md:p-6" style={{ background: '#f0fdf4' }}>
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'white', border: '1px solid #10b981' }}>
-                    <History size={20} />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ background: 'white', border: '1px solid #10b981' }}>
+                    <History size={22} />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-slate-900 leading-tight">Customer Delivery Schedule</h2>
-                    <p className="text-xs font-semibold text-emerald-600 uppercase tracking-widest mt-1">
+                    <h2 className="text-xl font-bold leading-tight text-slate-900 md:text-2xl">Customer Delivery Schedule</h2>
+                    <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-emerald-600 md:text-sm">
                       {selectedProduct.prod.name} ({selectedProduct.prod.sku})
                     </p>
                   </div>
                 </div>
+                <div className="ml-auto mr-2 inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setPopupViewMode('cards')}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] transition-all md:px-4 ${
+                      popupViewMode === 'cards' ? 'bg-emerald-500 text-white' : 'text-slate-500'
+                    }`}
+                  >
+                    <LayoutGrid size={12} />
+                    Card
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPopupViewMode('table')}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] transition-all md:px-4 ${
+                      popupViewMode === 'table' ? 'bg-slate-900 text-white' : 'text-slate-500'
+                    }`}
+                  >
+                    <Rows3 size={12} />
+                    Table
+                  </button>
+                </div>
                 <button
                   onClick={() => setSelectedProduct(null)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-400 transition-all" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-slate-400 transition-all hover:text-rose-400" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="p-5 grid grid-cols-1 gap-4 max-h-[60vh] overflow-y-auto" style={{ background: 'transparent' }}>
-                <div className="mb-2">
+              <div className="grid max-h-[calc(92vh-112px)] grid-cols-1 gap-5 overflow-y-auto p-5 md:p-6" style={{ background: 'transparent' }}>
+                <div className="mb-1">
                 </div>
 
                 {(() => {
@@ -514,27 +766,15 @@ const InventoryRisks = () => {
                       </div>
                     );
                   }
+
+                  if (popupViewMode === 'table') {
+                    return renderCustomerTableView(displayCustomers);
+                  }
+
                   return displayCustomers.map((cust, i) => (
                     <div key={cust.customer_id || i} className="flex flex-col p-4 rounded-xl gap-4 group transition-all" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                       {(() => {
-                        const orderEvents = Array.isArray(cust.order_events)
-                          ? cust.order_events.filter((evt) => evt?.order_date || evt?.delivery_date)
-                          : [];
-                        let deliveryDates = orderEvents
-                          .filter(evt => evt.delivery_date)
-                          .map(evt => evt.delivery_date);
-                        // If no deliveryDates but OUT event exists, use OUT's order_date as delivery
-                        if (deliveryDates.length === 0) {
-                          const outEvent = orderEvents.find(evt => evt.order_date && (!evt.delivery_date || evt.delivery_date === evt.order_date));
-                          if (outEvent) {
-                            deliveryDates = [outEvent.order_date];
-                          }
-                        }
-                        const orderDates = orderEvents
-                          .filter(evt => evt.order_date && (!evt.delivery_date || evt.delivery_date === ''))
-                          .map(evt => evt.order_date);
-                        const latestOrderDate = orderDates[0] || 'Unknown';
-                        const latestDeliveryDate = deliveryDates[0] || 'Not Scheduled';
+                        const { orderEvents, orderDates, latestOrderDate, latestDeliveryDate } = getCustomerPresentation(cust);
                         return (
                           <>
                             <div className="flex items-center justify-between">
@@ -645,4 +885,3 @@ const InventoryRisks = () => {
 };
 
 export default InventoryRisks;
-

@@ -10,7 +10,6 @@ import TaskHistory from './pages/TaskHistory';
 import InventoryRisks from './pages/InventoryRisks';
 import ForecastViewer from './pages/ForecastViewer';
 import ClientRecords from './pages/ClientRecords';
-import EmailAgent from './pages/EmailAgent';
 import Login from './pages/Login';
 import SheetBuilder from './pages/SheetBuilder';
 import AIRealTimeProcessor from './pages/AIRealTimeProcessor';
@@ -52,7 +51,6 @@ function App() {
                 <Route path="/risks"      element={<ProtectedRoute><InventoryRisks /></ProtectedRoute>} />
                 <Route path="/forecast"   element={<ProtectedRoute><ForecastViewer /></ProtectedRoute>} />
                 <Route path="/clients"    element={<ProtectedRoute><ClientRecords /></ProtectedRoute>} />
-                <Route path="/email"      element={<ProtectedRoute><EmailAgent /></ProtectedRoute>} />
                 <Route path="/ai-processor" element={<ProtectedRoute><AIRealTimeProcessor /></ProtectedRoute>} />
                 <Route path="/tasks"      element={<ProtectedRoute><TaskHistory /></ProtectedRoute>} />
                 <Route path="/audit"      element={<ProtectedRoute><PredictiveAudit /></ProtectedRoute>} />

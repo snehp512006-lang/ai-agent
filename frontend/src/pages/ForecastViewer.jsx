@@ -385,6 +385,127 @@ const normalizeForecastRows = (rows = []) =>
     upper: d.upper_bound != null ? Number(d.upper_bound) : Number(d.upper ?? 0),
   })).filter((row) => row.period);
 
+const toFiniteNum = (value, fallback = 0) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+};
+
+const toIsoDay = (date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString().slice(0, 10);
+};
+
+const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  year: 'numeric',
+});
+
+const aggregateMonthly = (rows = [], { valueKeys = [], mode = 'sum' } = {}) => {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+
+  const groups = new Map();
+
+  rows.forEach((row, idx) => {
+    const date = parseLooseDate(row?.period || row?.name || row?.date) || new Date();
+    if (!date) return;
+
+    const monthDate = new Date(date.getFullYear(), date.getMonth(), 1);
+    const key = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        totals: Object.fromEntries(valueKeys.map((item) => [item, 0])),
+        count: 0,
+        order: monthDate.getTime(),
+        label: MONTH_LABEL_FORMATTER.format(monthDate),
+      });
+    }
+
+    const group = groups.get(key);
+    valueKeys.forEach((keyName) => {
+      const value = Number(row?.[keyName] ?? 0);
+      group.totals[keyName] += Number.isFinite(value) ? value : 0;
+    });
+    group.count += 1;
+  });
+
+  return Array.from(groups.values())
+    .sort((a, b) => a.order - b.order)
+    .map((group) => {
+      const aggregated = {};
+      valueKeys.forEach((keyName) => {
+        aggregated[keyName] = group.count
+          ? (mode === 'avg' ? group.totals[keyName] / group.count : group.totals[keyName])
+          : 0;
+      });
+
+      return {
+        period: group.label,
+        ...aggregated,
+      };
+    });
+};
+
+const parseLooseDate = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const buildFallbackForecastFromPast = (pastRows = [], horizonDays = 30) => {
+  if (!Array.isArray(pastRows) || pastRows.length === 0) return [];
+
+  const values = pastRows
+    .map((row) => toFiniteNum(row?.actual, null))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  if (!values.length) return [];
+
+  const recent = values.slice(-Math.min(7, values.length));
+  const avg = recent.reduce((sum, value) => sum + value, 0) / Math.max(1, recent.length);
+  const baseline = Math.max(1, avg);
+  const lastDate = parseLooseDate(pastRows[pastRows.length - 1]?.period) || new Date();
+
+  return Array.from({ length: horizonDays }).map((_, idx) => {
+    const date = new Date(lastDate);
+    date.setDate(lastDate.getDate() + idx + 1);
+    return {
+      period: toIsoDay(date),
+      predicted: Math.round(baseline),
+      lower: Math.max(0, baseline * 0.9),
+      upper: Math.max(0, baseline * 1.1),
+    };
+  });
+};
+
+const buildForecastSeriesFromAnalysis = (analysisPayload = {}, pastRows = []) => {
+  const normalizedDemand = normalizeForecastRows(analysisPayload?.demand_forecast || []);
+  if (normalizedDemand.length > 0) return normalizedDemand;
+
+  const next365Days = Array.isArray(analysisPayload?.forecast?.next_365_days)
+    ? analysisPayload.forecast.next_365_days
+    : [];
+
+  if (next365Days.length > 0) {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return next365Days.map((value, idx) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + idx);
+      const predicted = Math.max(0, Math.round(toFiniteNum(value, 0)));
+      return {
+        period: toIsoDay(date),
+        predicted,
+        lower: Math.max(0, predicted * 0.9),
+        upper: Math.max(0, predicted * 1.1),
+      };
+    });
+  }
+
+  return buildFallbackForecastFromPast(pastRows, 30);
+};
+
 const buildForecastProductsFromAnalysis = (analysisPayload) => {
   const rows = Array.isArray(analysisPayload?.demand_forecast) ? analysisPayload.demand_forecast : [];
   const products = Array.isArray(analysisPayload?.products) ? analysisPayload.products : [];
@@ -475,19 +596,16 @@ const ForecastViewer = () => {
   const [showTrends, setShowTrends] = useState(false);
   const [showAllTrends, setShowAllTrends] = useState(false);
 
-  const timeGrouping = useMemo(() => {
-    if (forecastMode === 'past') return 'weekly';
-    if (forecastHorizon === 'year') return 'weekly';
-    return 'daily';
-  }, [forecastMode, forecastHorizon]);
-
   const displayPastData = useMemo(() => {
-    const sliceCount = forecastHorizon === 'week' ? 7 : forecastHorizon === 'month' ? 30 : 52;
-    if (timeGrouping === 'daily') return pastDailyData.slice(-sliceCount);
-    return pastWeeklyData.slice(-sliceCount);
-  }, [timeGrouping, pastDailyData, pastWeeklyData, forecastHorizon]);
+    const sliceCount = forecastHorizon === 'month' ? 6 : 12;
+    const sourceRows = pastDailyData.length ? pastDailyData : pastWeeklyData;
+    return aggregateMonthly(sourceRows, { valueKeys: ['actual'], mode: 'sum' }).slice(-sliceCount);
+  }, [pastDailyData, pastWeeklyData, forecastHorizon]);
 
-  const displayForecastData = useMemo(() => forecastRawData, [forecastRawData]);
+  const displayForecastData = useMemo(() => {
+    const sliceCount = forecastHorizon === 'month' ? 6 : 12;
+    return aggregateMonthly(forecastRawData, { valueKeys: ['predicted', 'lower', 'upper'], mode: 'sum' }).slice(0, sliceCount);
+  }, [forecastRawData, forecastHorizon]);
 
   const allTrends = useMemo(() => {
     if (!forecasts.length) return [];
@@ -572,9 +690,10 @@ const ForecastViewer = () => {
       }
 
       if (analysisPayload) {
-        setPastDailyData(normalizeActualRows(analysisPayload.past_sales_daily || analysisPayload.past_sales || []));
+        const normalizedPastDaily = normalizeActualRows(analysisPayload.past_sales_daily || analysisPayload.past_sales || []);
+        setPastDailyData(normalizedPastDaily);
         setPastWeeklyData(normalizeActualRows(analysisPayload.past_sales_weekly || []));
-        setForecastRawData(normalizeForecastRows(analysisPayload.demand_forecast || []));
+        setForecastRawData(buildForecastSeriesFromAnalysis(analysisPayload, normalizedPastDaily));
         setForecasts(buildForecastProductsFromAnalysis(analysisPayload));
         setAuditData({
           aggregate_accuracy: Number(analysisPayload.confidence_score || 0),
@@ -751,13 +870,13 @@ const ForecastViewer = () => {
                   animate={{ opacity: 1, x: 0 }}
                   className="inline-flex items-center rounded-full p-1.5 bg-slate-100 dark:bg-white/10 border border-slate-200/60 dark:border-white/10 shadow-sm ml-2"
                 >
-                  {['week', 'month', 'year'].map((h) => (
+                  {['month', 'year'].map((h) => (
                     <button
                       key={h}
                       onClick={() => setForecastHorizon(h)}
                       className={`px-3 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all duration-200 ${forecastHorizon === h ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md' : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-white/10'}`}
                     >
-                      {h === 'year' ? 'Full Year' : h === 'month' ? 'Month' : 'Week'}
+                      {h === 'year' ? 'Year' : 'Month'}
                     </button>
                   ))}
                 </motion.div>

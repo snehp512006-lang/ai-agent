@@ -1,12 +1,14 @@
 import React from 'react';
-import { Bell, Sun, Moon, Zap, Activity, Shield, Mail, Database, Layout, History } from 'lucide-react';
+import { Bell, Sun, Moon, Zap, Activity, Shield, Database, Layout, History } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAnalysis } from '../context/useAnalysis';
 
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
+  const { syncState } = useAnalysis();
 
   const getPageContext = () => {
     const path = location.pathname;
@@ -31,13 +33,6 @@ const Navbar = () => {
           status: 'Protection On', 
           icon: Shield, 
           color: 'text-amber-400' 
-        };
-      case '/email': 
-        return { 
-          label: 'Email Assistant', 
-          status: 'Ready to Help', 
-          icon: Mail, 
-          color: 'text-purple-400' 
         };
       case '/ai-processor': 
         return { 
@@ -85,6 +80,24 @@ const Navbar = () => {
   };
 
   const context = getPageContext();
+  const computeSyncPct = () => {
+    const lastSuccessAt = syncState?.lastSuccessAt;
+    if (!lastSuccessAt) return syncState?.status === 'CONNECTED' ? 100 : 0;
+    const ageMs = Date.now() - Number(lastSuccessAt);
+    if (!Number.isFinite(ageMs) || ageMs < 0) return 0;
+    if (ageMs <= 25000) return 100;
+    if (ageMs >= 120000) return 0;
+    return Math.max(0, Math.round(100 - ((ageMs - 25000) / (120000 - 25000)) * 100));
+  };
+  const syncPct = computeSyncPct();
+  const syncLabel = syncState?.status === 'NO_AUTH'
+    ? 'Auth Required'
+    : syncState?.status === 'DEGRADED'
+      ? 'Degraded'
+      : syncState?.status === 'CONNECTED'
+        ? `${syncPct}%`
+        : 'Booting';
+  const aiConnected = syncState?.status === 'CONNECTED' && syncPct >= 30;
 
   return (
     <header className="navbar relative px-8 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-sidebar)]">
@@ -109,7 +122,9 @@ const Navbar = () => {
                     {context.status}
                   </span>
                   <div className="w-1 h-1 rounded-full bg-slate-700 mx-1" />
-                  <span className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-widest">System Sync: 100%</span>
+                  <span className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-widest">
+                    System Sync: {syncLabel}
+                  </span>
                </div>
             </div>
           </motion.div>
@@ -118,9 +133,17 @@ const Navbar = () => {
 
       <div className="navbar-actions flex items-center gap-4">
         {/* Neural Pulse Indicator */}
-        <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-emerald-500/5 border border-emerald-500/10 rounded-full">
-           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-           <span className="text-[10px] font-black text-emerald-500/80 uppercase tracking-widest">AI is Connected</span>
+        <div className={`hidden md:flex items-center gap-3 px-4 py-2 rounded-full border ${
+          aiConnected ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-slate-500/5 border-white/5'
+        }`}>
+           <div className={`w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)] ${
+             aiConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'
+           }`} />
+           <span className={`text-[10px] font-black uppercase tracking-widest ${
+             aiConnected ? 'text-emerald-500/80' : 'text-slate-500'
+           }`}>
+             {aiConnected ? 'AI is Connected' : 'AI Offline'}
+           </span>
         </div>
 
         <button
