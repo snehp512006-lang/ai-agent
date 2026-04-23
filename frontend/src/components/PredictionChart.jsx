@@ -33,23 +33,28 @@ const parseDate = (value) => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
-const formatShortDate = (value) => {
+const isHourLabel = (value) => /^\d{2}:\d{2}$/.test(String(value || '').trim());
+
+const formatShortDate = (value, horizon = 'month') => {
+  if (horizon === 'day' && isHourLabel(value)) return String(value);
   const parsed = parseDate(value);
   return parsed ? SHORT_DATE_FORMATTER.format(parsed) : String(value || '');
 };
 
-const formatLongDate = (value) => {
+const formatLongDate = (value, horizon = 'month') => {
+  if (horizon === 'day' && isHourLabel(value)) return `${String(value)} block`;
   const parsed = parseDate(value);
   return parsed ? LONG_DATE_FORMATTER.format(parsed) : String(value || '');
 };
 
 const getHorizonLimit = (horizon) => {
-  if (horizon === 'month') return 6;
+  if (horizon === 'day') return 24;
+  if (horizon === 'month') return 62;
   return 12;
 };
 
 const buildChartData = ({ pastData = [], forecastData = [], mode = 'combined', horizon = 'month' }) => {
-  const showPast = mode !== 'present';
+  const showPast = mode !== 'future';
   const showForecast = mode !== 'past';
   const limitedForecast = showForecast ? forecastData.slice(0, getHorizonLimit(horizon)) : [];
 
@@ -87,9 +92,9 @@ const getSummaryCards = (rows = []) => {
     : null;
 
   return [
-    { label: 'Latest Actual', value: lastActual != null ? `${Math.round(lastActual).toLocaleString()} units` : 'Not available', icon: Activity, tone: 'emerald' },
-    { label: 'Forecast Average', value: avgForecast != null ? `${avgForecast.toLocaleString()} units` : 'Not available', icon: TrendingUp, tone: 'blue' },
-    { label: 'Forecast Peak', value: peakForecast != null ? `${peakForecast.toLocaleString()} units` : 'Not available', icon: CalendarRange, tone: 'violet' },
+    { label: 'Latest sales', value: lastActual != null ? `${Math.round(lastActual).toLocaleString()} units` : 'Not available', icon: Activity, tone: 'emerald' },
+    { label: 'Average forecast', value: avgForecast != null ? `${avgForecast.toLocaleString()} units` : 'Not available', icon: TrendingUp, tone: 'blue' },
+    { label: 'Peak forecast', value: peakForecast != null ? `${peakForecast.toLocaleString()} units` : 'Not available', icon: CalendarRange, tone: 'violet' },
   ];
 };
 
@@ -99,7 +104,7 @@ const toneClasses = {
   violet: 'border-violet-200 bg-violet-50 text-violet-700',
 };
 
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = ({ active, payload, label, horizon = 'month' }) => {
   if (!active || !payload?.length) return null;
 
   const row = payload[0]?.payload || {};
@@ -108,7 +113,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.10)]">
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{formatLongDate(label)}</p>
+      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{formatLongDate(label, horizon)}</p>
       <p className={`mt-2 text-xl font-black ${isHistorical ? 'text-blue-700' : 'text-emerald-700'}`}>
         {value != null ? Math.round(value).toLocaleString() : '0'}
       </p>
@@ -146,24 +151,24 @@ const PredictionChart = ({
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex h-full min-h-[360px] flex-col justify-between rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50/40 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)]"
+        className="flex h-full min-h-[360px] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
       >
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-700">Executive Forecast View</p>
-            <h3 className="mt-2 text-2xl font-black text-slate-900">Analysis Graph</h3>
+            <p className="text-[11px] font-semibold text-emerald-700">Forecast overview</p>
+            <h3 className="mt-2 text-2xl font-bold text-slate-900">Sales chart</h3>
           </div>
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-            {isAnalyzing ? 'Processing' : 'Waiting for analysis'}
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-medium text-slate-600">
+            {isAnalyzing ? 'Processing' : 'Waiting for data'}
           </div>
         </div>
 
         <div className="grid gap-3 md:grid-cols-3">
           {summaryCards.map(({ label, value, icon: Icon, tone }) => (
-            <div key={label} className={`rounded-2xl border px-4 py-4 ${toneClasses[tone]}`}>
+            <div key={label} className={`rounded-xl border px-4 py-4 ${toneClasses[tone]}`}>
               <div className="flex items-center gap-2">
                 <Icon size={14} />
-                <p className="text-[10px] font-black uppercase tracking-[0.14em]">{label}</p>
+                <p className="text-[11px] font-semibold">{label}</p>
               </div>
               <p className="mt-3 text-sm font-black text-slate-900">{value}</p>
             </div>
@@ -174,17 +179,17 @@ const PredictionChart = ({
           {isAnalyzing ? (
             <>
               <Loader2 size={36} className="animate-spin text-emerald-600" />
-              <p className="mt-4 text-lg font-black text-slate-900">Building analysis graph</p>
+              <p className="mt-4 text-lg font-bold text-slate-900">Preparing chart</p>
               <p className="mt-2 max-w-xl text-sm font-medium text-slate-500">
-                Your AI analysis is being processed. The graph will render automatically when past sales and forecast data become available.
+                Processing your analysis. The chart appears automatically when data is ready.
               </p>
             </>
           ) : (
             <>
               <BrainCircuit size={38} className="text-emerald-600" />
-              <p className="mt-4 text-lg font-black text-slate-900">No chart data available yet</p>
+              <p className="mt-4 text-lg font-bold text-slate-900">No chart data yet</p>
               <p className="mt-2 max-w-xl text-sm font-medium text-slate-500">
-                This section now uses real analysis output. Once your analysis payload includes past sales or forecast values, the professional graph will appear here automatically.
+                Upload or run analysis to view sales and forecast lines here.
               </p>
             </>
           )}
@@ -194,18 +199,18 @@ const PredictionChart = ({
   }
 
   return (
-    <motion.div
+      <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex h-full flex-col rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50/30 p-5 shadow-[0_20px_50px_rgba(15,23,42,0.06)]"
+      className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
       style={{ minHeight: chartHeight }}
     >
       <div className="mb-5 grid gap-3 md:grid-cols-3">
         {summaryCards.map(({ label, value, icon: Icon, tone }) => (
-          <div key={label} className={`rounded-2xl border px-4 py-4 ${toneClasses[tone]}`}>
+          <div key={label} className={`rounded-xl border px-4 py-4 ${toneClasses[tone]}`}>
             <div className="flex items-center gap-2">
               <Icon size={14} />
-              <p className="text-[10px] font-black uppercase tracking-[0.14em]">{label}</p>
+              <p className="text-[11px] font-semibold">{label}</p>
             </div>
             <p className="mt-3 text-sm font-black text-slate-900">{value}</p>
           </div>
@@ -213,22 +218,22 @@ const PredictionChart = ({
       </div>
 
       {showLegend && (
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-medium text-blue-700">
             <span className="h-2 w-2 rounded-full bg-blue-600" />
             Actual Sales
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
+          <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-medium text-emerald-700">
             <span className="h-2 w-2 rounded-full bg-emerald-600" />
             AI Forecast
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-            {mode === 'past' ? 'Past only' : mode === 'present' ? 'Forecast only' : 'Combined'}
+          <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600">
+            {mode === 'past' ? 'Past only' : mode === 'future' ? 'Future only' : 'Past + Future'}
           </div>
         </div>
       )}
 
-      <div className="flex-1 overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white/80 p-4">
+      <div className="flex-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/40 p-4">
         <ResponsiveContainer width="100%" height={fullScreen ? '100%' : Math.max(260, chartHeight - 180)}>
           <AreaChart data={chartData} margin={{ top: 18, right: 18, left: 0, bottom: 10 }}>
             <defs>
@@ -245,7 +250,7 @@ const PredictionChart = ({
             <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="4 6" />
             <XAxis
               dataKey="period"
-              tickFormatter={formatShortDate}
+              tickFormatter={(value) => formatShortDate(value, horizon)}
               axisLine={false}
               tickLine={false}
               tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }}
@@ -261,7 +266,7 @@ const PredictionChart = ({
               }}
               width={56}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip horizon={horizon} />} />
 
             <Area type="monotone" dataKey="actual" stroke="none" fill="url(#actualFill)" connectNulls />
             <Line

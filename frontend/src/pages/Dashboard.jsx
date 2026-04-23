@@ -38,6 +38,7 @@ import {
 const ICON_MAP = {
   TrendingUp, AlertCircle, Package, BrainCircuit, ShoppingCart, Factory, Zap, Target
 };
+const LAST_ANALYSIS_STORAGE_KEY = 'ai-ops-last-analysis-snapshot';
 
 const RETENTION_LEVELS = ['MINOR_DROP', 'MAJOR_DROP', 'NOT_PURCHASED', 'NEW_CUSTOMER', 'MIXED_PERFORMANCE', 'THODA_KAM', 'BAHUT_KAM', 'LIYA_HI_NAHI'];
 const CUSTOMER_NAME_KEYS = ['customer_name', 'customer', 'client', 'client_name', 'company', 'company_name', 'party', 'party_name', 'buyer', 'account_name'];
@@ -212,6 +213,29 @@ const toProfessionalPartyText = (value) => {
 const getFieldFallback = (value) => {
   if (!isMeaningfulText(value)) return 'Not available';
   return String(value).trim();
+};
+
+const hasUsableAnalysisPayload = (payload) => Boolean(
+  payload && (
+    (Array.isArray(payload?.products) && payload.products.length > 0)
+    || (Array.isArray(payload?.products_analysis) && payload.products_analysis.length > 0)
+    || (Array.isArray(payload?.customers) && payload.customers.length > 0)
+    || (Array.isArray(payload?.demand_forecast) && payload.demand_forecast.length > 0)
+    || (Array.isArray(payload?.past_sales_daily) && payload.past_sales_daily.length > 0)
+    || (Array.isArray(payload?.past_sales) && payload.past_sales.length > 0)
+  )
+);
+
+const readStoredAnalysisSnapshot = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(LAST_ANALYSIS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return hasUsableAnalysisPayload(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
 };
 
 const getCustomerDisplayName = (customer = {}) => {
@@ -982,14 +1006,25 @@ const Dashboard = () => {
   const { analysis: liveAnalysis, latestMeta, selectedUploadId } = useAnalysis();
   const { isLayoutFullscreen, enableFullscreen, disableFullscreen } = useLayoutFullscreen();
   const navigate = useNavigate();
+  const initialAnalysisSnapshotRef = useRef(
+    hasUsableAnalysisPayload(liveAnalysis) ? liveAnalysis : readStoredAnalysisSnapshot()
+  );
+  const initialAnalysisSnapshot = initialAnalysisSnapshotRef.current;
+  const initialPastDailyData = normalizeActualRows(
+    initialAnalysisSnapshot?.past_sales_daily || initialAnalysisSnapshot?.past_sales || []
+  );
+  const initialPastWeeklyData = normalizeActualRows(initialAnalysisSnapshot?.past_sales_weekly || []);
+  const initialForecastRawData = initialAnalysisSnapshot
+    ? buildDailyForecastFromAnalysis(initialAnalysisSnapshot)
+    : [];
 
   const [data, setData] = useState({ kpis: [], decisions: [], system_health: 0, predicted_risks: 0, forecasted_revenue: 0 });
   const [chartData, setChartData] = useState([]);
-  const [pastDailyData, setPastDailyData] = useState([]);
-  const [pastWeeklyData, setPastWeeklyData] = useState([]);
-  const [forecastRawData, setForecastRawData] = useState([]);
-  const [analysis, setAnalysis] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [pastDailyData, setPastDailyData] = useState(initialPastDailyData);
+  const [pastWeeklyData, setPastWeeklyData] = useState(initialPastWeeklyData);
+  const [forecastRawData, setForecastRawData] = useState(initialForecastRawData);
+  const [analysis, setAnalysis] = useState(initialAnalysisSnapshot);
+  const [loading, setLoading] = useState(!initialAnalysisSnapshot);
   const [forecastMode, setForecastMode] = useState('past');
   const [selectedClientForModal, setSelectedClientForModal] = useState(null);
   const [forecastHorizon, setForecastHorizon] = useState('month');
@@ -1060,8 +1095,26 @@ const Dashboard = () => {
 
   const liveAnalysisKey = `${liveAnalysis?.analysis_isolation?.session_id || 'none'}:${liveAnalysis?.confidence_score ?? 'na'}:${liveAnalysis?.sales_summary?.total_sales ?? 'na'}:${liveAnalysis?.stock_analysis?.low_stock_items ?? 'na'}`;
 
+  const hasUsableLiveAnalysis = hasUsableAnalysisPayload(liveAnalysis);
+
+  const applyDashboardAnalysis = (analysisPayload) => {
+    timeoutInfoShownRef.current = false;
+    setData((prev) => ({ ...prev, decisions: [] }));
+    setAnalysis(analysisPayload);
+
+    const pastDaily = normalizeActualRows(
+      analysisPayload?.past_sales_daily || analysisPayload?.past_sales || []
+    );
+    const pastWeekly = normalizeActualRows(analysisPayload?.past_sales_weekly || []);
+    const forecastChart = buildDailyForecastFromAnalysis(analysisPayload);
+    setPastDailyData(pastDaily);
+    setPastWeeklyData(pastWeekly);
+    setForecastRawData(forecastChart);
+    setChartData([]);
+  };
+
   useEffect(() => {
-    fetchDashboardData({ showLoader: true, preferLive: false });
+    fetchDashboardData({ showLoader: !hasUsableLiveAnalysis && !initialAnalysisSnapshot, preferLive: true });
   }, []);
 
   useEffect(() => {
@@ -1362,6 +1415,11 @@ const Dashboard = () => {
       let analysisPayload = preferLive ? (liveAnalysis || null) : null;
       let latestPayload = null;
 
+      if (analysisPayload && hasUsableLiveAnalysis) {
+        applyDashboardAnalysis(analysisPayload);
+        if (showLoader) setLoading(false);
+      }
+
       if (!analysisPayload) {
         try {
           const latestRes = await fetchLatestAnalysisWithRetry(showLoader ? 7000 : 11000);
@@ -1396,19 +1454,7 @@ const Dashboard = () => {
       }
 
       if (analysisPayload) {
-        timeoutInfoShownRef.current = false;
-        setData((prev) => ({ ...prev, decisions: [] }));
-        setAnalysis(analysisPayload);
-
-        const pastDaily = normalizeActualRows(
-          analysisPayload.past_sales_daily || analysisPayload.past_sales || []
-        );
-        const pastWeekly = normalizeActualRows(analysisPayload.past_sales_weekly || []);
-        const forecastChart = buildDailyForecastFromAnalysis(analysisPayload);
-        setPastDailyData(pastDaily);
-        setPastWeeklyData(pastWeekly);
-        setForecastRawData(forecastChart);
-        setChartData([]);
+        applyDashboardAnalysis(analysisPayload);
         return;
       }
 
@@ -1869,7 +1915,7 @@ const Dashboard = () => {
     return Math.max(0, Math.min(100, weighted));
   })();
 
-  if (loading) {
+  if (loading && !analysis) {
     return (
       <div className="flex flex-col items-center justify-center p-40 gap-6">
         <div className="relative">

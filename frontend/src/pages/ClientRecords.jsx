@@ -1,11 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Phone, MapPin, Search, ShieldCheck, TrendingDown, TrendingUp, Minus, Users, ArrowUpRight } from 'lucide-react';
+import { Mail, Phone, MapPin, Search, ShieldCheck, TrendingDown, TrendingUp, Minus, Users, ArrowUpRight, LayoutGrid, Rows3 } from 'lucide-react';
 import GlassCard from '../components/GlassCard';
 import ProductPurchaseModal from '../components/ProductPurchaseModal';
 import { useAnalysis } from '../context/useAnalysis';
 import api from '../api/client';
 import { resolveCustomerBehavior, getCustomerBehaviorMeta, toWatchCategory } from '../utils/customerBehaviorContract';
+import {
+  buildInventoryFromTransactions,
+  extractInventoryRows,
+  DEFAULT_LOW_STOCK_THRESHOLD,
+} from '../features/inventory-engine/buildInventoryFromTransactions';
 
 const LAST_ANALYSIS_STORAGE_KEY = 'ai-ops-last-analysis-snapshot';
 
@@ -322,6 +327,42 @@ const hasPopulatedStockIn = (payload) => {
   const monthly = Array.isArray(stock.monthly_stock_in) ? stock.monthly_stock_in : [];
   const byDate = Array.isArray(stock.stock_in_by_date) ? stock.stock_in_by_date : [];
   return monthly.length > 0 || byDate.length > 0;
+};
+
+const normalizeClientAnalysisSource = (payload) => {
+  if (!payload || typeof payload !== 'object') return payload;
+
+  const source = payload?.analysis && typeof payload.analysis === 'object'
+    ? payload.analysis
+    : (payload?.payload?.analysis && typeof payload.payload.analysis === 'object'
+      ? payload.payload.analysis
+      : payload);
+
+  const directCustomers = Array.isArray(source?.customers) ? source.customers : [];
+  const customerAnalysis = Array.isArray(source?.customer_analysis)
+    ? source.customer_analysis
+    : (Array.isArray(source?.customer_analysis?.customers) ? source.customer_analysis.customers : []);
+  const existingProducts = Array.isArray(source?.products)
+    ? source.products
+    : (Array.isArray(source?.products_analysis) ? source.products_analysis : []);
+
+  if (directCustomers.length || customerAnalysis.length || existingProducts.length) {
+    return source;
+  }
+
+  const inventoryRows = extractInventoryRows(source);
+  if (!Array.isArray(inventoryRows) || inventoryRows.length === 0) {
+    return source;
+  }
+
+  const inventoryModel = buildInventoryFromTransactions(inventoryRows, {
+    lowStockThreshold: DEFAULT_LOW_STOCK_THRESHOLD,
+  });
+
+  return {
+    ...source,
+    products: inventoryModel.products,
+  };
 };
 
 const buildCustomersFromCustomerAnalysis = (customerAnalysis = []) => {
@@ -881,6 +922,55 @@ const pickBestSnapshot = (...sources) => {
   return ranked.length > 0 ? ranked[0].source : null;
 };
 
+const getClientAnalysisSourceMeta = ({ analysis, cachedAnalysis, remoteAnalysis, analysisSnapshot, remoteChecked }) => {
+  const normalizedLive = normalizeClientAnalysisSource(analysis);
+  const normalizedCached = normalizeClientAnalysisSource(cachedAnalysis);
+  const normalizedRemote = normalizeClientAnalysisSource(remoteAnalysis);
+
+  if (analysisSnapshot && normalizedLive && analysisSnapshot === normalizedLive && hasCustomerPayload(normalizedLive)) {
+    return {
+      label: 'Live Analysis',
+      detail: 'Showing current in-app analysis results.',
+      tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      dot: 'bg-emerald-500',
+    };
+  }
+
+  if (analysisSnapshot && normalizedCached && analysisSnapshot === normalizedCached && hasCustomerPayload(normalizedCached)) {
+    return {
+      label: 'Cached Snapshot',
+      detail: 'Showing last good analysis saved in memory.',
+      tone: 'border-sky-200 bg-sky-50 text-sky-700',
+      dot: 'bg-sky-500',
+    };
+  }
+
+  if (analysisSnapshot && normalizedRemote && analysisSnapshot === normalizedRemote && hasCustomerPayload(normalizedRemote)) {
+    return {
+      label: 'Latest Remote Analysis',
+      detail: 'Recovered from latest server analysis for this workspace.',
+      tone: 'border-violet-200 bg-violet-50 text-violet-700',
+      dot: 'bg-violet-500',
+    };
+  }
+
+  if (!remoteChecked) {
+    return {
+      label: 'Checking Analysis',
+      detail: 'Looking for the latest customer analysis source.',
+      tone: 'border-amber-200 bg-amber-50 text-amber-700',
+      dot: 'bg-amber-500',
+    };
+  }
+
+  return {
+    label: 'No Analysis Found',
+    detail: 'Run or sync analysis so customer watch results can appear here.',
+    tone: 'border-rose-200 bg-rose-50 text-rose-700',
+    dot: 'bg-rose-500',
+  };
+};
+
 const ClientRecords = () => {
   const { analysis } = useAnalysis();
   const [cachedAnalysis, setCachedAnalysis] = useState(null);
@@ -907,18 +997,31 @@ const ClientRecords = () => {
       const raw = localStorage.getItem(LAST_ANALYSIS_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        localSnapshot = parsed?.analysis ?? parsed?.payload?.analysis ?? parsed;
+        localSnapshot = normalizeClientAnalysisSource(parsed);
       }
     } catch {
       localSnapshot = null;
     }
 
-    return pickBestSnapshot(analysis, cachedAnalysis, remoteAnalysis, localSnapshot);
+    return pickBestSnapshot(
+      normalizeClientAnalysisSource(analysis),
+      normalizeClientAnalysisSource(cachedAnalysis),
+      normalizeClientAnalysisSource(remoteAnalysis),
+      localSnapshot
+    );
   }, [analysis, cachedAnalysis, remoteAnalysis]);
 
   const resolvedAnalysis = useMemo(() => {
     return analysisSnapshot?.analysis ?? analysisSnapshot?.payload?.analysis ?? analysisSnapshot ?? {};
   }, [analysisSnapshot]);
+
+  const sourceMeta = useMemo(() => getClientAnalysisSourceMeta({
+    analysis,
+    cachedAnalysis,
+    remoteAnalysis,
+    analysisSnapshot,
+    remoteChecked,
+  }), [analysis, cachedAnalysis, remoteAnalysis, analysisSnapshot, remoteChecked]);
 
   useEffect(() => {
     if (remoteChecked) return;
@@ -931,7 +1034,7 @@ const ClientRecords = () => {
       try {
         const res = await api.get('/ingestion/latest-analysis/');
         if (cancelled) return;
-        const payload = res?.data;
+        const payload = normalizeClientAnalysisSource(res?.data);
         if (payload && hasCustomerPayload(payload)) {
           setRemoteAnalysis(payload);
         }
@@ -1029,6 +1132,7 @@ const ClientRecords = () => {
   }, [resolvedAnalysis, analysisSnapshot]);
   const [activeTab, setActiveTab] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState('cards');
 
   const tabCounts = useMemo(() => {
     return customers.reduce((acc, client) => {
@@ -1057,6 +1161,8 @@ const ClientRecords = () => {
     });
   }, [customers, activeTab, searchTerm]);
 
+  const isResolvingAnalysis = !remoteChecked && !analysisSnapshot && customers.length === 0;
+
   const tabs = [
     { id: 'ALL', label: 'All Customers' },
     { id: 'STOPPED', label: 'Stopped Buying' },
@@ -1064,14 +1170,132 @@ const ClientRecords = () => {
     { id: 'GOOD', label: 'Good / New' },
   ];
 
+  const renderTableView = (items) => (
+    <div className="overflow-hidden rounded-[1.8rem] border border-slate-200/70 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900/40">
+      <div className="flex flex-col gap-2 border-b border-slate-200/60 bg-gradient-to-r from-white via-rose-50/40 to-slate-50 px-5 py-4 md:flex-row md:items-center md:justify-between dark:border-white/10 dark:from-slate-900 dark:via-rose-500/5 dark:to-slate-900">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-rose-500">Customer Table View</p>
+        </div>
+        <div className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-rose-600 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
+          {items.length} customers visible
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[920px] table-fixed">
+          <thead>
+            <tr className="bg-slate-100/90 text-left dark:bg-slate-800/70">
+              {['Customer', 'Category', 'Purchase', 'Metric', 'Buyer', 'Email', 'Phone', 'Last Purchase', 'Action'].map((label) => (
+                <th key={label} className="px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-700 dark:text-slate-300">
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((client, index) => {
+              const statusSplit = client.status_split || getStatusSplit(client, customers.map((c) => toNum(c?.status_split?.currentPurchase, 0)));
+              const hasMixedBehavior = isMixedBehaviorClient(client, statusSplit);
+              const behavior = resolveCustomerBehavior(client, { hasMixedBehavior });
+              const behaviorMeta = getCustomerBehaviorMeta(behavior);
+              const category = toWatchCategory(behavior);
+              const primaryMetric = getPrimaryStatusMetric(category, statusSplit);
+              const theme = behaviorMeta.theme;
+
+              return (
+                <tr
+                  key={`client-row-${client.customer_id || client.customer_name || index}`}
+                  className="border-t border-slate-200/70 bg-white transition-colors hover:bg-rose-50/40 dark:border-white/10 dark:bg-transparent dark:hover:bg-white/5"
+                >
+                  <td className="px-3 py-4 align-top">
+                    <div className="flex items-start gap-3">
+                      <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-white shadow-sm dark:bg-slate-900/60 ${theme.border}`}>
+                        <Users size={15} className={theme.text} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-[12px] font-black uppercase tracking-tight text-slate-900 dark:text-white">
+                          {getClientName(client)}
+                        </p>
+                        <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                          Buyer: {getClientBuyerIdentity(client)}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-4 align-top">
+                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] ${theme.border} ${theme.bg} ${theme.text}`}>
+                      {behaviorMeta.label}
+                    </span>
+                  </td>
+                  <td className="px-3 py-4 align-top text-[12px] font-black text-slate-900 dark:text-white">
+                    {formatCompact(client.total_purchase)}
+                  </td>
+                  <td className="px-3 py-4 align-top">
+                    <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/70">
+                      <p className={`text-[13px] font-black ${primaryMetric.text}`}>{primaryMetric.value}%</p>
+                      <p className={`mt-1 text-[10px] font-bold uppercase tracking-[0.08em] ${primaryMetric.labelText}`}>{primaryMetric.label}</p>
+                    </div>
+                  </td>
+                  <td className="px-3 py-4 align-top text-[11px] font-semibold text-slate-700 dark:text-slate-300 break-words">
+                    {getClientBuyerIdentity(client)}
+                  </td>
+                  <td className="px-3 py-4 align-top text-[11px] font-semibold text-slate-600 dark:text-slate-300 break-words">
+                    {client.email || '-'}
+                  </td>
+                  <td className="px-3 py-4 align-top text-[11px] font-semibold text-slate-600 dark:text-slate-300 break-words">
+                    {client.phone || '-'}
+                  </td>
+                  <td className="px-3 py-4 align-top text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                    {formatDateShort(client.last_order_date)}
+                  </td>
+                  <td className="px-3 py-4 align-top">
+                    <button
+                      onClick={() => setSelectedClientForModal(client)}
+                      className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.12em] text-white transition-all hover:brightness-110 ${theme.action}`}
+                    >
+                      Open
+                      <ArrowUpRight size={12} />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6 pb-16">
+      {isResolvingAnalysis ? (
+        <div className="flex min-h-[72vh] flex-col items-center justify-center">
+          <div className="relative mb-6 flex h-20 w-20 items-center justify-center">
+            <div className="absolute inset-0 rounded-full border-4 border-emerald-500/10 border-t-emerald-500 animate-spin" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 shadow-[0_12px_30px_rgba(16,185,129,0.14)]">
+              <ShieldCheck size={30} className="text-emerald-500" />
+            </div>
+          </div>
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-600 dark:text-slate-300">
+            Loading your data...
+          </p>
+          <p className="mt-2 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+            Preparing customer watch analysis
+          </p>
+        </div>
+      ) : (
+        <>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Customer Watch List</h1>
           <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] mt-1.5">
             Customers who may need your attention based on buying patterns
           </p>
+          <div className={`mt-4 inline-flex items-center gap-3 rounded-full border px-4 py-2 text-[11px] font-bold ${sourceMeta.tone}`}>
+            <span className={`h-2.5 w-2.5 rounded-full ${sourceMeta.dot}`} />
+            <span>{sourceMeta.label}</span>
+            <span className="hidden text-current/70 md:inline">• {sourceMeta.detail}</span>
+          </div>
         </div>
         <div className="grid grid-cols-3 gap-4">
           {[
@@ -1107,15 +1331,44 @@ const ClientRecords = () => {
         </div>
 
         <div className="px-6 py-4 border-b border-slate-200/40 dark:border-white/10 bg-white/60 dark:bg-slate-900/30">
-          <div className="flex items-center gap-3 rounded-2xl border border-slate-200/70 dark:border-white/10 bg-white dark:bg-slate-900 px-4 py-3 shadow-sm">
-            <Search size={16} className="text-slate-400" />
-            <input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by name, email, phone, or address..."
-              className="flex-1 bg-transparent text-sm font-semibold text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none"
-            />
-            <span className="text-[10px] font-bold text-slate-400">{filteredCustomers.length} total</span>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-200/70 dark:border-white/10 bg-white dark:bg-slate-900 px-4 py-3 shadow-sm lg:flex-1">
+              <Search size={16} className="text-slate-400" />
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by name, email, phone, or address..."
+                className="flex-1 bg-transparent text-sm font-semibold text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none"
+              />
+              <span className="text-[10px] font-bold text-slate-400">{filteredCustomers.length} total</span>
+            </div>
+
+            <div className="inline-flex w-fit items-center gap-1 rounded-[1.1rem] border border-slate-200 bg-white/90 p-1 shadow-[0_8px_20px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-slate-900/70">
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                className={`inline-flex items-center gap-2 rounded-[0.9rem] px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition-all ${
+                  viewMode === 'cards'
+                    ? 'bg-rose-500 text-white shadow-[0_10px_24px_rgba(244,63,94,0.24)]'
+                    : 'text-slate-500 hover:text-rose-600'
+                }`}
+              >
+                <LayoutGrid size={14} />
+                Card View
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`inline-flex items-center gap-2 rounded-[0.9rem] px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition-all ${
+                  viewMode === 'table'
+                    ? 'bg-slate-900 text-white shadow-[0_10px_24px_rgba(15,23,42,0.18)]'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Rows3 size={14} />
+                Table View
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1130,6 +1383,8 @@ const ClientRecords = () => {
               </p>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-2">All customers in this group are doing well right now.</p>
             </div>
+          ) : viewMode === 'table' ? (
+            renderTableView(filteredCustomers)
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredCustomers.map((client, index) => {
@@ -1230,6 +1485,8 @@ const ClientRecords = () => {
         client={selectedClientForModal}
         analysisData={resolvedAnalysis}
       />
+        </>
+      )}
     </div>
   );
 };

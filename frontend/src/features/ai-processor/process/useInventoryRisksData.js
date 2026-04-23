@@ -42,6 +42,7 @@ const toRiskStatsFromSummary = (summary = {}) => ({
 
 const NO_STORAGE_FULFILLMENT_MODE = true;
 const LEDGER_LOW_STOCK_THRESHOLD = DEFAULT_LOW_STOCK_THRESHOLD;
+const LAST_ANALYSIS_STORAGE_KEY = 'ai-ops-last-analysis-snapshot';
 const PRODUCT_NAME_ALIASES = ['product_name', 'product', 'name', 'item_name', 'item', 'material_name'];
 const DIRECTION_ALIASES = ['in_out', 'in/out', 'type', 'transaction_type', 'txn_type', 'movement', 'movement_type', 'entry_type', 'dr_cr'];
 const QTY_ALIASES = ['quantity', 'qty', 'units', 'movement_qty', 'transaction_qty'];
@@ -244,6 +245,29 @@ const extractUploadId = (analysisPayload = {}) => {
   if (!match) return null;
   const parsed = Number(match[1]);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const hasMeaningfulAnalysisPayload = (payload) => Boolean(
+  payload
+  && typeof payload === 'object'
+  && (
+    (Array.isArray(payload?.products) && payload.products.length > 0)
+    || (Array.isArray(payload?.products_analysis) && payload.products_analysis.length > 0)
+    || (Array.isArray(payload?.transactions) && payload.transactions.length > 0)
+    || (Array.isArray(payload?.raw_transactions) && payload.raw_transactions.length > 0)
+  )
+);
+
+const readStoredAnalysisSnapshot = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(LAST_ANALYSIS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
 };
 
 const mapProductForCards = (product, idx, latestPriceByProductKey = null, demandByProductKey = null) => {
@@ -461,6 +485,7 @@ export const useInventoryRisksData = ({ liveAnalysis: _liveAnalysis, selectedUpl
   const lastSuccessfulLedgerFetchKeyRef = useRef(null);
   const ledgerFetchAttemptsRef = useRef(new Map()); // key -> attempts
   const hasResolvedCorrectPayloadRef = useRef(false);
+  const hasMeaningfulLocalAnalysis = hasMeaningfulAnalysisPayload(_liveAnalysis);
 
   // If user explicitly pins a different upload, unlock and re-lock to the new one.
   useEffect(() => {
@@ -477,7 +502,33 @@ export const useInventoryRisksData = ({ liveAnalysis: _liveAnalysis, selectedUpl
   }, [selectedUploadId]);
 
   useEffect(() => {
+    const parsedLatestUploadId = Number(latestUploadId);
+    if (selectedUploadId || !Number.isFinite(parsedLatestUploadId) || parsedLatestUploadId <= 0) {
+      return;
+    }
+
+    if (lockedUploadIdRef.current && lockedUploadIdRef.current !== parsedLatestUploadId) {
+      lockedUploadIdRef.current = null;
+      lockedRiskStatsRef.current = null;
+      lastSuccessfulLedgerFetchKeyRef.current = null;
+      hasResolvedCorrectPayloadRef.current = false;
+      setRiskStats({
+        out_of_stock: 0,
+        low_stock: 0,
+        deadstock: 0,
+        overstock: 0,
+        healthy: 0,
+      });
+    }
+  }, [latestUploadId, selectedUploadId]);
+
+  useEffect(() => {
     let cancelled = false;
+    const storedAnalysis = readStoredAnalysisSnapshot();
+    const hasMeaningfulStoredAnalysis = hasMeaningfulAnalysisPayload(storedAnalysis);
+    const localFallbackAnalysis = hasMeaningfulLocalAnalysis
+      ? _liveAnalysis
+      : (hasMeaningfulStoredAnalysis ? storedAnalysis : null);
     const liveUploadId = extractUploadId(_liveAnalysis || {}) || (Number(latestUploadId) > 0 ? Number(latestUploadId) : null);
     const needsRemoteRefresh = Boolean(selectedUploadId) && String(selectedUploadId) !== String(liveUploadId || '');
     const livePayloadUploadId = extractUploadId(_liveAnalysis || {}) || null;
@@ -495,6 +546,9 @@ export const useInventoryRisksData = ({ liveAnalysis: _liveAnalysis, selectedUpl
         // If we don't even know desiredUploadId yet, only use live payload after we already resolved once
         // (prevents first paint from stale localStorage snapshot).
         || (!selectedUploadId && !desiredUploadId && hasResolvedCorrectPayloadRef.current)
+        // Offline/degraded fallback: if we have a meaningful local snapshot but no upload ids,
+        // render it instead of showing an empty page forever.
+        || (!selectedUploadId && !desiredUploadId && !livePayloadUploadId && hasMeaningfulLocalAnalysis)
       )
     );
 
@@ -533,6 +587,20 @@ export const useInventoryRisksData = ({ liveAnalysis: _liveAnalysis, selectedUpl
         }
       } catch {
         // Ignore warm-start errors and continue with remote fetch fallback.
+      }
+    } else if (!needsRemoteRefresh && localFallbackAnalysis) {
+      try {
+        const fallbackState = buildUiStateFromPayload(localFallbackAnalysis);
+        if (!cancelled) {
+          setProducts(fallbackState.products);
+          setRiskStats(fallbackState.riskStats);
+          setAnalysisReady(fallbackState.analysisReady);
+          setMappingError(fallbackState.mappingError || 'SHOWING LAST AVAILABLE ANALYSIS SNAPSHOT');
+          setAnalysisSnapshot(localFallbackAnalysis);
+          hasResolvedCorrectPayloadRef.current = true;
+        }
+      } catch {
+        // Ignore and continue to remote fetch.
       }
     } else if (needsRemoteRefresh) {
       // Force clear while remote payload loads (avoid showing stale cached snapshot).
@@ -645,7 +713,7 @@ export const useInventoryRisksData = ({ liveAnalysis: _liveAnalysis, selectedUpl
           }
         }
 
-        const resolvedPayload = analysisPayload || null;
+        const resolvedPayload = analysisPayload || localFallbackAnalysis || null;
         const nextState = buildUiStateFromPayload(resolvedPayload || {});
         const resolvedUploadId = resolveLockedUploadId(resolvedPayload);
         let stableLedgerStats = null;
@@ -671,16 +739,39 @@ export const useInventoryRisksData = ({ liveAnalysis: _liveAnalysis, selectedUpl
       } catch (err) {
         console.error('Failed to fetch inventory:', err);
         if (!cancelled) {
-          setProducts([]);
-          setRiskStats({
-            out_of_stock: 0,
-            low_stock: 0,
-            deadstock: 0,
-            overstock: 0,
-            healthy: 0,
-          });
-          setAnalysisReady(false);
-          setMappingError('FAILED TO BUILD INVENTORY FROM TRANSACTIONS');
+          if (localFallbackAnalysis) {
+            try {
+              const fallbackState = buildUiStateFromPayload(localFallbackAnalysis || {});
+              setProducts(fallbackState.products);
+              setRiskStats(fallbackState.riskStats);
+              setAnalysisReady(fallbackState.analysisReady);
+              setAnalysisSnapshot(localFallbackAnalysis || null);
+              setMappingError(fallbackState.mappingError || 'SHOWING LAST AVAILABLE ANALYSIS SNAPSHOT');
+              hasResolvedCorrectPayloadRef.current = true;
+            } catch {
+              setProducts([]);
+              setRiskStats({
+                out_of_stock: 0,
+                low_stock: 0,
+                deadstock: 0,
+                overstock: 0,
+                healthy: 0,
+              });
+              setAnalysisReady(false);
+              setMappingError('FAILED TO BUILD INVENTORY FROM TRANSACTIONS');
+            }
+          } else {
+            setProducts([]);
+            setRiskStats({
+              out_of_stock: 0,
+              low_stock: 0,
+              deadstock: 0,
+              overstock: 0,
+              healthy: 0,
+            });
+            setAnalysisReady(false);
+            setMappingError('FAILED TO BUILD INVENTORY FROM TRANSACTIONS');
+          }
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -691,7 +782,7 @@ export const useInventoryRisksData = ({ liveAnalysis: _liveAnalysis, selectedUpl
     return () => {
       cancelled = true;
     };
-  }, [_liveAnalysis, selectedUploadId]);
+  }, [_liveAnalysis, selectedUploadId, latestUploadId]);
 
   useEffect(() => {
     if (!selectedProduct?.prod) {

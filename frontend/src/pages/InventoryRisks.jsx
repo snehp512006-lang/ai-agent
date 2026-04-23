@@ -216,6 +216,58 @@ const InventoryRisks = () => {
     setSelectedProduct({ prod, actionPlan: getActionPlan(prod) });
   };
 
+  const getCustomerTrendMeta = (cust) => {
+    const trendRaw = String(cust?.trend_tag || cust?.trend || cust?.monthly_trend || '').trim();
+    const riskRaw = String(cust?.risk_level || '').trim();
+    const trendKey = trendRaw.toLowerCase();
+    const riskKey = riskRaw.toLowerCase();
+
+    let trendLabel = 'Stable';
+    let riskLabel = 'Low';
+
+    if (
+      trendKey.includes('drop')
+      || trendKey.includes('down')
+      || trendKey.includes('declin')
+      || trendKey.includes('less')
+      || riskKey.includes('high')
+    ) {
+      trendLabel = 'Drop';
+      riskLabel = 'High';
+    } else if (
+      trendKey.includes('mixed')
+      || trendKey.includes('flat')
+      || riskKey.includes('medium')
+    ) {
+      trendLabel = trendRaw || 'Mixed';
+      riskLabel = 'Medium';
+    } else if (
+      trendKey.includes('increas')
+      || trendKey.includes('grow')
+      || trendKey.includes('up')
+    ) {
+      trendLabel = 'Increasing';
+      riskLabel = 'Low';
+    }
+
+    const riskTone = riskLabel === 'Low'
+      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      : (riskLabel === 'Medium'
+        ? 'bg-amber-50 text-amber-700 border-amber-200'
+        : 'bg-rose-50 text-rose-700 border-rose-200');
+
+    const trendTone = trendLabel === 'Drop'
+      ? 'text-rose-500'
+      : (trendLabel === 'Increasing' ? 'text-emerald-600' : 'text-slate-500');
+
+    return {
+      trendLabel,
+      riskLabel,
+      riskTone,
+      trendTone,
+    };
+  };
+
   const getCustomerPresentation = (cust) => {
     const orderEvents = Array.isArray(cust?.order_events)
       ? cust.order_events.filter((evt) => evt?.order_date || evt?.delivery_date)
@@ -239,6 +291,7 @@ const InventoryRisks = () => {
     return {
       orderEvents,
       orderDates,
+      deliveryDates,
       latestOrderDate: orderDates[0] || 'Unknown',
       latestDeliveryDate: deliveryDates[0] || 'Not Scheduled',
     };
@@ -260,11 +313,7 @@ const InventoryRisks = () => {
           <tbody>
             {customers.map((cust, i) => {
               const { orderEvents, orderDates, latestOrderDate, latestDeliveryDate } = getCustomerPresentation(cust);
-              const riskTone = cust.risk_level === 'Low'
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : (cust.risk_level === 'Medium'
-                  ? 'bg-amber-50 text-amber-700 border-amber-200'
-                  : 'bg-rose-50 text-rose-700 border-rose-200');
+              const { riskLabel, trendLabel, riskTone, trendTone } = getCustomerTrendMeta(cust);
 
               return (
                 <tr key={`popup-table-${cust.customer_id || i}`} className="border-t border-slate-100 hover:bg-slate-50/80">
@@ -274,14 +323,14 @@ const InventoryRisks = () => {
                   </td>
                   <td className="px-3 py-3 align-top">
                     <span className={`inline-flex rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] ${riskTone}`}>
-                      {cust.risk_level} Risk
+                      {riskLabel} Risk
                     </span>
                   </td>
                   <td className="px-3 py-3 align-top text-[12px] font-black text-slate-900">{toUnitsSafe(cust.total_purchased)} U</td>
                   <td className="px-3 py-3 align-top text-[12px] font-bold text-slate-700">{orderEvents.length || orderDates.length}</td>
                   <td className="px-3 py-3 align-top text-[11px] font-semibold text-slate-600 break-words">{latestOrderDate}</td>
                   <td className="px-3 py-3 align-top text-[11px] font-semibold text-emerald-700 break-words">{latestDeliveryDate}</td>
-                  <td className="px-3 py-3 align-top text-[10px] font-bold text-slate-500 break-words">{cust.trend_tag || 'Stable'}</td>
+                  <td className={`px-3 py-3 align-top text-[10px] font-bold break-words ${trendTone}`}>{trendLabel}</td>
                 </tr>
               );
             })}
@@ -663,7 +712,7 @@ const InventoryRisks = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 p-3 md:p-6"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-2 sm:p-4 md:p-6"
             onClick={() => setSelectedProduct(null)}
           >
             <motion.div
@@ -676,23 +725,23 @@ const InventoryRisks = () => {
                 border: '1px solid #10b981',
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 15px rgba(16, 185, 129, 0.05)'
               }}
-              className="relative w-full max-w-[1180px] max-h-[92vh] rounded-[2rem] overflow-hidden"
+              className="relative h-[94vh] w-[min(96vw,1440px)] max-h-[94vh] rounded-[2rem] overflow-hidden"
             >
               {/* Removed background gradient for simplicity */}
 
-              <div className="flex items-center justify-between gap-4 border-b border-emerald-100 p-5 md:p-6" style={{ background: '#f0fdf4' }}>
-                <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-emerald-100 p-4 md:p-6" style={{ background: '#f0fdf4' }}>
+                <div className="flex min-w-0 items-center gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ background: 'white', border: '1px solid #10b981' }}>
                     <History size={22} />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h2 className="text-xl font-bold leading-tight text-slate-900 md:text-2xl">Customer Delivery Schedule</h2>
-                    <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-emerald-600 md:text-sm">
+                    <p className="mt-1 truncate text-xs font-semibold uppercase tracking-widest text-emerald-600 md:text-sm">
                       {selectedProduct.prod.name} ({selectedProduct.prod.sku})
                     </p>
                   </div>
                 </div>
-                <div className="ml-auto mr-2 inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                <div className="ml-auto inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
                   <button
                     type="button"
                     onClick={() => setPopupViewMode('cards')}
@@ -716,13 +765,13 @@ const InventoryRisks = () => {
                 </div>
                 <button
                   onClick={() => setSelectedProduct(null)}
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-slate-400 transition-all hover:text-rose-400" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-all hover:border-rose-200 hover:text-rose-500"
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="grid max-h-[calc(92vh-112px)] grid-cols-1 gap-5 overflow-y-auto p-5 md:p-6" style={{ background: 'transparent' }}>
+              <div className="grid h-[calc(94vh-104px)] grid-cols-1 gap-5 overflow-y-auto p-4 md:h-[calc(94vh-112px)] md:p-6" style={{ background: 'transparent' }}>
                 <div className="mb-1">
                 </div>
 
@@ -771,109 +820,111 @@ const InventoryRisks = () => {
                     return renderCustomerTableView(displayCustomers);
                   }
 
-                  return displayCustomers.map((cust, i) => (
-                    <div key={cust.customer_id || i} className="flex flex-col p-4 rounded-xl gap-4 group transition-all" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                      {(() => {
-                        const { orderEvents, orderDates, latestOrderDate, latestDeliveryDate } = getCustomerPresentation(cust);
-                        return (
-                          <>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'white', border: '1px solid #10b981' }}>
-                                  <span className="text-lg font-bold text-emerald-600">{cust.name?.charAt(0) || 'C'}</span>
-                                </div>
-                                <div>
-                                  <h4 className="text-base font-bold text-slate-900 leading-tight uppercase tracking-tight">{cust.name || 'Unknown Client'}</h4>
-                                  <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mt-1 flex items-center gap-2">
-                                    <span className="w-1 h-3 bg-emerald-500 rounded-full"></span>
-                                    {cust.company || 'Direct Buyer Partner'}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex flex-col items-end gap-1">
-                                <div className={`px-2 py-1 rounded text-[9px] font-bold tracking-widest uppercase border ${cust.risk_level === 'Low' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                  (cust.risk_level === 'Medium' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200')
-                                  }`}>
-                                  {cust.risk_level} PROFILE
-                                </div>
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">AI AGENT VERIFIED</span>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 rounded-2xl bg-white border border-slate-100 shadow-sm relative overflow-hidden">
-                              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 blur-3xl -mr-12 -mt-12 rounded-full"></div>
-
-                              <div className="border-r border-slate-100 pr-4">
-                                <span className="block text-[11px] font-bold text-slate-500 mb-1">Total Unit</span>
-                                <span className="text-lg font-bold text-slate-900 leading-none">{cust.total_purchased || 0} <span className="text-[10px] text-slate-400 font-bold">U</span></span>
-                              </div>
-
-                              <div className="border-r border-slate-100 pr-4">
-                                <span className="block text-[11px] font-bold text-slate-500 mb-1">Orders</span>
-                                <span className="text-sm font-bold text-slate-700">{orderEvents.length || orderDates.length} total</span>
-                                <p className="text-[11px] font-semibold text-slate-500 mt-1">Latest: {latestOrderDate}</p>
-                              </div>
-
-                              <div className="pl-2">
-                                <span className="block text-[11px] font-bold text-emerald-700 mb-1">Delivery Date</span>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                                  <span className="text-sm font-bold text-slate-900">{latestDeliveryDate}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="rounded-xl bg-white border border-slate-100 p-3">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Order & Delivery Timeline</span>
-                                <span className="text-[10px] font-bold text-slate-400">{orderEvents.length || orderDates.length} records</span>
-                              </div>
-
-                              {orderEvents.length === 0 ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-slate-600">
-                                  {orderDates.map((dateValue, idx2) => (
-                                    <div key={`timeline-fallback-${idx2}`} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
-                                      <p className="font-bold text-slate-700">Order: {dateValue}</p>
-                                      <p className="text-slate-500">Delivery: {deliveryDates[idx2] || latestDeliveryDate}</p>
+                  return (
+                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+                      {displayCustomers.map((cust, i) => (
+                        <div key={cust.customer_id || i} className="flex min-h-full flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition-all group">
+                          {(() => {
+                            const { orderEvents, orderDates, deliveryDates, latestOrderDate, latestDeliveryDate } = getCustomerPresentation(cust);
+                            const { riskLabel, trendLabel, riskTone, trendTone } = getCustomerTrendMeta(cust);
+                            return (
+                              <>
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex min-w-0 items-center gap-4">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: 'white', border: '1px solid #10b981' }}>
+                                      <span className="text-lg font-bold text-emerald-600">{cust.name?.charAt(0) || 'C'}</span>
                                     </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="max-h-36 overflow-y-auto pr-1 space-y-2">
-                                  {orderEvents.map((evt, idx2) => (
-                                    <div key={`timeline-${idx2}`} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
-                                      <div className="flex items-center justify-between gap-2">
-                                        <p className="text-[11px] font-bold text-slate-700">Order: {evt.order_date || 'Unknown'}</p>
-                                        <p className="text-[11px] font-bold text-slate-900">{toUnitsSafe(evt.units)} U</p>
-                                      </div>
-                                      <p className="text-[11px] text-slate-500 mt-0.5">Delivery: {evt.delivery_date || 'Not Scheduled'}</p>
+                                    <div className="min-w-0">
+                                      <h4 className="truncate text-base font-bold leading-tight uppercase tracking-tight text-slate-900">{cust.name || 'Unknown Client'}</h4>
+                                      <p className="mt-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-emerald-700">
+                                        <span className="h-3 w-1 rounded-full bg-emerald-500"></span>
+                                        <span className="truncate">{cust.company || 'Direct Buyer Partner'}</span>
+                                      </p>
                                     </div>
-                                  ))}
+                                  </div>
+                                  <div className="flex shrink-0 flex-col items-end gap-1">
+                                    <div className={`rounded border px-2 py-1 text-[9px] font-bold uppercase tracking-widest ${riskTone}`}>
+                                      {riskLabel} PROFILE
+                                    </div>
+                                    <span className="text-[9px] font-bold uppercase tracking-tighter text-slate-400">AI AGENT VERIFIED</span>
+                                  </div>
                                 </div>
-                              )}
-                            </div>
 
-                            <div className="flex items-center justify-between pt-1">
-                              <div className="flex items-center gap-3">
-                                <div className="px-3 py-1 rounded-full bg-slate-50 border border-slate-200 flex items-center gap-2">
-                                  <BrainCircuit size={10} className="text-slate-400" />
-                                  <span className={`text-[10px] font-bold ${cust.trend_tag?.includes('Drop') ? 'text-rose-500' : (cust.trend_tag?.includes('Increasing') ? 'text-emerald-600' : 'text-slate-500')
-                                    }`}>
-                                    Trend: {cust.trend_tag}
-                                  </span>
+                                <div className="relative grid grid-cols-1 gap-3 overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 shadow-sm md:grid-cols-3">
+                                  <div className="absolute -right-12 -top-12 h-24 w-24 rounded-full bg-emerald-500/5 blur-3xl"></div>
+
+                                  <div className="md:border-r md:border-slate-100 md:pr-4">
+                                    <span className="mb-1 block text-[11px] font-bold text-slate-500">Total Unit</span>
+                                    <span className="text-lg font-bold leading-none text-slate-900">{cust.total_purchased || 0} <span className="text-[10px] font-bold text-slate-400">U</span></span>
+                                  </div>
+
+                                  <div className="md:border-r md:border-slate-100 md:pr-4">
+                                    <span className="mb-1 block text-[11px] font-bold text-slate-500">Orders</span>
+                                    <span className="text-sm font-bold text-slate-700">{orderEvents.length || orderDates.length} total</span>
+                                    <p className="mt-1 text-[11px] font-semibold text-slate-500">Latest: {latestOrderDate}</p>
+                                  </div>
+
+                                  <div>
+                                    <span className="mb-1 block text-[11px] font-bold text-emerald-700">Delivery Date</span>
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
+                                      <span className="text-sm font-bold text-slate-900">{latestDeliveryDate}</span>
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
 
-                              <div className="flex items-center gap-2 text-slate-400 font-bold text-[10px] px-3 py-1.5 rounded-lg border border-slate-100 bg-slate-50">
-                                <Truck size={12} />
-                                Auto-Schedule
-                              </div>
-                            </div>
-                          </>
-                        );
-                      })()}
+                                <div className="rounded-xl border border-slate-100 bg-white p-3">
+                                  <div className="mb-2 flex items-center justify-between">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Order & Delivery Timeline</span>
+                                    <span className="text-[10px] font-bold text-slate-400">{orderEvents.length || orderDates.length} records</span>
+                                  </div>
+
+                                  {orderEvents.length === 0 ? (
+                                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                                      {orderDates.map((dateValue, idx2) => (
+                                        <div key={`timeline-fallback-${idx2}`} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-600">
+                                          <p className="font-bold text-slate-700">Order: {dateValue}</p>
+                                          <p className="text-slate-500">Delivery: {deliveryDates[idx2] || latestDeliveryDate}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="max-h-36 space-y-2 overflow-y-auto pr-1">
+                                      {orderEvents.map((evt, idx2) => (
+                                        <div key={`timeline-${idx2}`} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
+                                          <div className="flex items-center justify-between gap-2">
+                                            <p className="text-[11px] font-bold text-slate-700">Order: {evt.order_date || 'Unknown'}</p>
+                                            <p className="text-[11px] font-bold text-slate-900">{toUnitsSafe(evt.units)} U</p>
+                                          </div>
+                                          <p className="mt-0.5 text-[11px] text-slate-500">Delivery: {evt.delivery_date || 'Not Scheduled'}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center justify-between gap-3 pt-1">
+                                  <div className="flex min-w-0 items-center gap-3">
+                                    <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+                                      <BrainCircuit size={10} className="text-slate-400" />
+                                      <span className={`text-[10px] font-bold ${trendTone}`}>
+                                        Trend: {trendLabel}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-[10px] font-bold text-slate-400">
+                                    <Truck size={12} />
+                                    Auto-Schedule
+                                  </div>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      ))}
                     </div>
-                  ));
+                  );
                 })()}
               </div>
             </motion.div>
