@@ -43,7 +43,7 @@ import {
 import api from '../api/client';
 import { useAnalysis } from '../context/useAnalysis';
 
-// ─── Status config for forecast items ──────────────────────────────────────
+// â”€â”€â”€ Status config for forecast items â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FORECAST_STATUS = {
   HIGH_DEMAND: {
     label: 'High Demand',
@@ -71,7 +71,7 @@ const FORECAST_STATUS = {
   },
   LOW_DEMAND: {
     label: 'Low Demand',
-    description: 'Sales forecast below average — consider reducing stock.',
+    description: 'Sales forecast below average â€” consider reducing stock.',
     badge: 'Low Demand',
     badgeColor: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
     border: 'border-amber-200 dark:border-amber-500/30',
@@ -83,7 +83,7 @@ const FORECAST_STATUS = {
   },
   CRITICAL: {
     label: 'Critical Low',
-    description: 'Forecast shows near-zero demand — review stocking plan.',
+    description: 'Forecast shows near-zero demand â€” review stocking plan.',
     badge: 'Critical',
     badgeColor: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',
     border: 'border-red-200 dark:border-red-500/30',
@@ -95,7 +95,7 @@ const FORECAST_STATUS = {
   },
   NEW_ITEM: {
     label: 'New Item',
-    description: 'First forecast cycle — limited historical data available.',
+    description: 'First forecast cycle â€” limited historical data available.',
     badge: 'New',
     badgeColor: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400',
     border: 'border-purple-200 dark:border-purple-500/30',
@@ -109,7 +109,7 @@ const FORECAST_STATUS = {
 
 const DEFAULT_FORECAST_STATUS = {
   label: 'Analyzing',
-  description: 'Forecast being computed…',
+  description: 'Forecast being computedâ€¦',
   badge: 'Pending',
   badgeColor: 'bg-slate-100 text-slate-600',
   border: 'border-slate-200 dark:border-white/10',
@@ -129,7 +129,7 @@ const getForecastStatus = (product) => {
   return FORECAST_STATUS.HIGH_DEMAND;
 };
 
-// ─── Tabs ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TABS = [
   { id: 'ALL', label: 'All Products', icon: Package },
   { id: 'HIGH_DEMAND', label: 'High Demand', icon: TrendingUp },
@@ -147,7 +147,7 @@ const getFilteredProducts = (products, tabId) => {
   return products.filter((p) => getForecastStatus(p).label === FORECAST_STATUS[tabId]?.label);
 };
 
-// ─── Search bar ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Search bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SEARCH_FIELD_OPTIONS = [
   { value: 'all', label: 'All Fields', icon: Search },
   { value: 'name', label: 'Product Name', icon: Package },
@@ -195,7 +195,7 @@ const SearchBar = ({ value, onChange, field, onFieldChange, totalCount, matchCou
             type="text"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            placeholder={`Search by ${selected.label.toLowerCase()}…`}
+            placeholder={`Search by ${selected.label.toLowerCase()}â€¦`}
             className="flex-1 py-3.5 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 bg-transparent outline-none min-w-0"
           />
         </div>
@@ -256,7 +256,7 @@ const SearchBar = ({ value, onChange, field, onFieldChange, totalCount, matchCou
   );
 };
 
-// ─── Mini bar chart inside card ──────────────────────────────────────────────
+// â”€â”€â”€ Mini bar chart inside card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const MiniChart = ({ weeks, active }) => {
   const max = Math.max(...weeks.map((w) => w.demand || 1), 1);
   return (
@@ -281,7 +281,7 @@ const MiniChart = ({ weeks, active }) => {
   );
 };
 
-// ─── Forecast Product Card ────────────────────────────────────────────────────
+// â”€â”€â”€ Forecast Product Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ForecastCard = React.forwardRef(({ product, index, onViewDetail }, ref) => {
   const cfg = getForecastStatus(product);
   const StatusIcon = cfg.icon;
@@ -375,7 +375,7 @@ const ForecastCard = React.forwardRef(({ product, index, onViewDetail }, ref) =>
   );
 });
 
-// ─── Normalization utils ─────────────────────────────────────────────────────
+// â”€â”€â”€ Normalization utils â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const normalizeActualRows = (rows = []) =>
   rows.map((d) => ({ period: d.date || d.period || d.name, actual: Number(d.actual ?? d.value ?? d.sales ?? 0) }))
     .filter((row) => row.period);
@@ -1166,7 +1166,7 @@ const hasUsableForecastPayload = (payload) => {
   );
 };
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ForecastViewer = () => {
   const { analysis: liveAnalysis, selectedUploadId } = useAnalysis();
   const [auditData, setAuditData] = useState({ aggregate_accuracy: 0, stability: 'Analyzing...', recommendation: '' });
@@ -1716,95 +1716,11 @@ const ForecastViewer = () => {
   return (
     <div className="space-y-6 pb-20">
 
-      {/* ── Page Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-            Sales Forecast
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
-            Predicted sales for each product based on your real historical data.
-          </p>
-        </div>
 
-        {/* Summary stats */}
-        <div className="flex items-center gap-4">
-          {[
-            { label: 'High Demand', count: tabCounts['HIGH_DEMAND'], color: 'text-emerald-500' },
-            { label: 'Moderate', count: tabCounts['MODERATE'], color: 'text-blue-500' },
-            { label: 'Low Demand', count: tabCounts['LOW_DEMAND'], color: 'text-amber-500' },
-          ].map((s) => (
-            <div key={s.label} className="text-center">
-              <p className={`text-xl font-black ${s.color}`}>{s.count}</p>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{s.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
 
-      {/* ── Main Card ── */}
+      {/* â”€â”€ Main Card â”€â”€ */}
       <GlassCard className="!p-0 !border-slate-200/60 dark:!border-white/10 !bg-white dark:!bg-slate-900/40 overflow-visible shadow-xl">
 
-        {/* ── Toolbar ── */}
-        <div className="px-6 py-5 border-b border-slate-100 dark:border-white/10 space-y-4">
-
-          {/* Status Tabs */}
-          <div className="flex flex-wrap gap-2">
-            {TABS.map((tab) => {
-              const TabIcon = tab.icon;
-              const isActive = activeFilter === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveFilter(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-300
-                    ${isActive
-                      ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
-                      : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'}`}
-                >
-                  <TabIcon size={13} />
-                  {tab.label}
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black
-                    ${isActive ? 'bg-white/25 text-white' : 'bg-white dark:bg-white/10 text-slate-500 dark:text-slate-400'}`}>
-                    {tabCounts[tab.id]}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Search Bar */}
-          <SearchBar
-            value={searchTerm}
-            onChange={setSearchTerm}
-            field={searchField}
-            onFieldChange={setSearchField}
-            totalCount={tabCounts[activeFilter]}
-            matchCount={displayProducts.length}
-          />
-
-          {/* Active search hint */}
-          {searchTerm && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400"
-            >
-              <Filter size={12} />
-              Filtering by <strong className="text-emerald-500">{searchTerm}</strong> in{' '}
-              <strong>{searchField === 'all' ? 'all fields' : searchField}</strong>
-              {' '}— {displayProducts.length} match{displayProducts.length !== 1 ? 'es' : ''}
-              <button
-                onClick={() => { setSearchTerm(''); setSearchField('all'); }}
-                className="ml-auto text-[11px] font-bold text-emerald-500 hover:underline"
-              >
-                Clear search
-              </button>
-            </motion.div>
-          )}
-        </div>
 
         {/* ── AI Engine status bar ── */}
         <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
@@ -1835,271 +1751,267 @@ const ForecastViewer = () => {
               <p className="text-[13px] text-slate-500 dark:text-slate-400">
                 Past and future demand view
               </p>
+
+              <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+                {[
+                  {
+                    label: 'Customers',
+                    value: historySummary.customerCount,
+                    hint: `${historySummary.stockCount} stocks in selected window`,
+                    icon: Users,
+                    tone: 'text-sky-600 bg-sky-50 border-sky-200',
+                  },
+                  {
+                    label: 'Units Ordered',
+                    value: formatUnits(historySummary.quantity),
+                    hint: `${filteredHistoryRows.length} order rows`,
+                    icon: Box,
+                    tone: 'text-violet-600 bg-violet-50 border-violet-200',
+                  },
+                  {
+                    label: 'Order Value',
+                    value: formatCompactCurrency(historySummary.totalAmount),
+                    hint: 'Total billed amount',
+                    icon: CircleDollarSign,
+                    tone: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+                  },
+                  {
+                    label: 'Payment Received',
+                    value: formatCompactCurrency(historySummary.paidAmount),
+                    hint: `${historySummary.paidOrders} fully paid orders`,
+                    icon: CheckCircle2,
+                    tone: 'text-teal-600 bg-teal-50 border-teal-200',
+                  },
+                  {
+                    label: 'Pending Balance',
+                    value: formatCompactCurrency(historySummary.pendingAmount),
+                    hint: `${historySummary.partialOrders + historySummary.pendingOrders} orders need follow-up`,
+                    icon: Activity,
+                    tone: 'text-amber-700 bg-amber-50 border-amber-200',
+                  },
+                ].map((card) => {
+                  const Icon = card.icon;
+                  return (
+                    <div key={card.label} className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{card.label}</p>
+                          <p className="mt-2 text-[20px] font-black tracking-tight text-slate-900">{card.value}</p>
+                          <p className="mt-1 text-[11px] font-semibold text-slate-500">{card.hint}</p>
+                        </div>
+                        <div className={`flex h-11 w-11 items-center justify-center rounded-2xl border ${card.tone}`}>
+                          <Icon size={18} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-slate-200 bg-slate-50/60 p-2.5 mb-4">
-              <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white p-1">
-                <button
-                  onClick={() => setForecastMode('past')}
-                  className={`px-3.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-200 ${forecastMode === 'past' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
-                >
-                  Past
-                </button>
-                <button
-                  onClick={() => setForecastMode('future')}
-                  className={`px-3.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-200 ${forecastMode === 'future' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
-                >
-                  Future
-                </button>
-                <button
-                  onClick={() => setForecastMode('combined')}
-                  className={`px-3.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-200 ${forecastMode === 'combined' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
-                >
-                  Combined
-                </button>
-              </div>
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="inline-flex items-center rounded-xl border border-slate-200 bg-white p-1"
+            <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white p-1">
+              <button
+                onClick={() => setForecastMode('past')}
+                className={`px-3.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-200 ${forecastMode === 'past' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
               >
-                {['day', 'month', 'year'].map((option) => (
-                  <button
-                    key={option}
-                    onClick={() => setTimeGranularity(option)}
-                    className={`px-3 py-2 rounded-lg text-[12px] font-medium transition-all duration-200 ${timeGranularity === option ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </motion.div>
-              <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-2 py-1.5">
-                {timeGranularity === 'day' && (
-                  <input
-                    type="date"
-                    value={selectedDay}
-                    onChange={(e) => setSelectedDay(e.target.value)}
-                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-700 focus:border-slate-400 focus:outline-none"
-                  />
-                )}
-                {timeGranularity === 'month' && (
-                  <input
-                    type="month"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-700 focus:border-slate-400 focus:outline-none"
-                  />
-                )}
-                {timeGranularity === 'year' && (
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value)}
-                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-700 focus:border-slate-400 focus:outline-none"
-                  >
-                    {availableYears.map((yearValue) => (
-                      <option key={yearValue} value={String(yearValue)}>
-                        {yearValue}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-              <div className="ml-auto inline-flex items-center gap-2">
-                <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-                  <button
-                    type="button"
-                    title="Chart view"
-                    aria-label="Chart view"
-                    onClick={() => setForecastViewMode('chart')}
-                    className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-medium transition-colors ${forecastViewMode === 'chart' ? 'border-slate-900 bg-slate-900 text-white' : 'border-transparent text-slate-600 hover:bg-slate-100'}`}
-                  >
-                    <BarChart3 size={14} />
-                    <span>Chart</span>
-                  </button>
-                  <button
-                    type="button"
-                    title="Table view"
-                    aria-label="Table view"
-                    onClick={() => setForecastViewMode('table')}
-                    className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-medium transition-colors ${forecastViewMode === 'table' ? 'border-slate-900 bg-slate-900 text-white' : 'border-transparent text-slate-600 hover:bg-slate-100'}`}
-                  >
-                    <List size={14} />
-                    <span>Table</span>
-                  </button>
-                </div>
+                Past
+              </button>
+              <button
+                onClick={() => setForecastMode('future')}
+                className={`px-3.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-200 ${forecastMode === 'future' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+              >
+                Future
+              </button>
+              <button
+                onClick={() => setForecastMode('combined')}
+                className={`px-3.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-200 ${forecastMode === 'combined' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+              >
+                Combined
+              </button>
+            </div>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="inline-flex items-center rounded-xl border border-slate-200 bg-white p-1"
+            >
+              {['day', 'month', 'year'].map((option) => (
                 <button
-                  onClick={() => {
-                    setShowAllTrends(false);
-                    setShowTrends(true);
-                  }}
-                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700 hover:bg-slate-100"
+                  key={option}
+                  onClick={() => setTimeGranularity(option)}
+                  className={`px-3 py-2 rounded-lg text-[12px] font-medium transition-all duration-200 ${timeGranularity === option ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
                 >
-                  <TrendingUp size={14} />
-                  Trends
+                  {option}
+                </button>
+              ))}
+            </motion.div>
+            <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-2 py-1.5">
+              {timeGranularity === 'day' && (
+                <input
+                  type="date"
+                  value={selectedDay}
+                  onChange={(e) => setSelectedDay(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-700 focus:border-slate-400 focus:outline-none"
+                />
+              )}
+              {timeGranularity === 'month' && (
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-700 focus:border-slate-400 focus:outline-none"
+                />
+              )}
+              {timeGranularity === 'year' && (
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-700 focus:border-slate-400 focus:outline-none"
+                >
+                  {availableYears.map((yearValue) => (
+                    <option key={yearValue} value={String(yearValue)}>
+                      {yearValue}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div className="ml-auto inline-flex items-center gap-2">
+              <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                <button
+                  type="button"
+                  title="Chart view"
+                  aria-label="Chart view"
+                  onClick={() => setForecastViewMode('chart')}
+                  className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-medium transition-colors ${forecastViewMode === 'chart' ? 'border-slate-900 bg-slate-900 text-white' : 'border-transparent text-slate-600 hover:bg-slate-100'}`}
+                >
+                  <BarChart3 size={14} />
+                  <span>Chart</span>
+                </button>
+                <button
+                  type="button"
+                  title="Table view"
+                  aria-label="Table view"
+                  onClick={() => setForecastViewMode('table')}
+                  className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-medium transition-colors ${forecastViewMode === 'table' ? 'border-slate-900 bg-slate-900 text-white' : 'border-transparent text-slate-600 hover:bg-slate-100'}`}
+                >
+                  <List size={14} />
+                  <span>Table</span>
                 </button>
               </div>
-          </div>
-          <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <p className="text-[12px] font-medium text-slate-500">Selected period</p>
-              <p className="mt-1 text-[15px] font-semibold text-slate-900">{selectionLabel}</p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <p className="text-[12px] font-medium text-slate-500">Current total</p>
-              <p className="mt-1 text-[15px] font-semibold text-slate-900">{formatUnits(comparisonMetrics.currentValue)} units</p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <p className="text-[12px] font-medium text-slate-500">Change vs previous</p>
-              <p className={`mt-1 text-[15px] font-semibold ${comparisonMetrics.delta >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                {comparisonMetrics.delta >= 0 ? '+' : ''}{formatUnits(comparisonMetrics.delta)} units
-                {comparisonMetrics.deltaPct !== null ? ` (${comparisonMetrics.deltaPct >= 0 ? '+' : ''}${comparisonMetrics.deltaPct.toFixed(1)}%)` : ''}
-              </p>
+              <button
+                onClick={() => {
+                  setShowAllTrends(false);
+                  setShowTrends(true);
+                }}
+                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700 hover:bg-slate-100"
+              >
+                <TrendingUp size={14} />
+                Trends
+              </button>
             </div>
           </div>
-          {forecastViewMode === 'chart' ? (
-            <div className="min-h-[300px]">
-              <PredictionChart
-                pastData={displayPastData}
-                forecastData={displayForecastData}
-                mode={forecastMode}
-                horizon={timeGranularity}
-              />
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+
+          <div className="mt-5 grid grid-cols-1 gap-6">
+
+
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-5 py-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Detailed Ledger</p>
+                  <h4 className="mt-1 text-lg font-black text-slate-900">Who bought what, when, and payment status</h4>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600">
+                  <Truck size={14} className="text-emerald-500" />
+                  Delivery + payment timeline
+                </div>
+              </div>
+
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] table-fixed">
-                  <thead>
-                    <tr className="bg-slate-50 text-left">
-                      {['Period', 'Actual Sales', 'Forecast', 'Range'].map((label) => (
-                        <th key={label} className="px-4 py-3 text-[11px] font-semibold text-slate-600">
-                          {label}
-                        </th>
-                      ))}
+                <table className="w-full min-w-full border-separate border-spacing-0">
+                  <thead className="bg-slate-50/80">
+                    <tr>
+                      {['Customer', 'Stock', 'Qty', 'Order Value', 'Paid', 'Pending', 'Order Date', 'Delivery', 'Payment'].map((label) => {
+                        const isNumeric = ['Qty', 'Order Value', 'Paid', 'Pending'].includes(label);
+                        return (
+                          <th
+                            key={label}
+                            className={`px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 whitespace-nowrap border-r border-b border-slate-200/60 last:border-r-0 ${isNumeric ? 'text-right' : 'text-left'}`}
+                          >
+                            {label}
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
-                    {combinedWindowRows.length === 0 ? (
+                    {filteredHistoryRows.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">
-                          No rows available for selected filters.
+                        <td colSpan={10} className="px-4 py-12 text-center">
+                          <div className="mx-auto max-w-md">
+                            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600">
+                              <ShieldCheck size={26} />
+                            </div>
+                            <p className="mt-4 text-base font-black text-slate-900">No past result rows for selected filter</p>
+                            <p className="mt-2 text-sm text-slate-500">
+                              Agar uploaded sheet mein customer, product, quantity, order/delivery ya payment columns honge to yeh section automatically populate ho jayega.
+                            </p>
+                          </div>
                         </td>
                       </tr>
                     ) : (
-                      combinedWindowRows.map((row, idx) => (
-                        <tr key={`${row.period}-${idx}`} className="border-t border-slate-100">
-                          <td className="px-4 py-3 text-sm font-medium text-slate-800">{row.period}</td>
-                          <td className="px-4 py-3 text-sm text-slate-700">
-                            {row.actual != null ? `${formatUnits(row.actual)} units` : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-700">
-                            {row.predicted != null ? `${formatUnits(row.predicted)} units` : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-700">
-                            {row.lower != null && row.upper != null
-                              ? `${formatUnits(row.lower)} - ${formatUnits(row.upper)}`
-                              : '-'}
-                          </td>
-                        </tr>
-                      ))
+                      filteredHistoryRows.map((row) => {
+                        const paymentTone = row.paymentStatus === 'Paid'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : (row.paymentStatus === 'Partial'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-rose-50 text-rose-700 border-rose-200');
+
+                        return (
+                          <tr key={row.id} className="align-top hover:bg-slate-50/80 transition-colors">
+                            <td className="px-6 py-5 border-r border-b border-slate-100 last:border-r-0">
+                              <p className="text-sm font-bold text-slate-900">{row.customerName}</p>
+                              {row.customerId && row.customerId !== row.customerName && (
+                                <p className="mt-1 text-[10px] font-medium text-slate-400 tracking-wide">{row.customerId}</p>
+                              )}
+                            </td>
+                            <td className="px-6 py-5 border-r border-b border-slate-100 last:border-r-0">
+                              <p className="text-sm font-medium text-slate-700 leading-snug">{row.stockName}</p>
+                            </td>
+                            <td className="px-6 py-5 text-right text-sm font-bold text-slate-900 tabular-nums border-r border-b border-slate-100 last:border-r-0">{formatUnits(row.quantity)}</td>
+                            <td className="px-6 py-5 text-right text-sm font-bold text-slate-900 tabular-nums border-r border-b border-slate-100 last:border-r-0">{formatCurrency(row.totalAmount || 0)}</td>
+                            <td className="px-6 py-5 text-right text-sm font-bold text-emerald-600 tabular-nums border-r border-b border-slate-100 last:border-r-0">{formatCurrency(row.paidAmount || 0)}</td>
+                            <td className="px-6 py-5 text-right text-sm font-bold text-amber-600 tabular-nums border-r border-b border-slate-100 last:border-r-0">{formatCurrency(row.pendingAmount || 0)}</td>
+                            <td className="px-6 py-5 border-r border-b border-slate-100 last:border-r-0">
+                              <p className="text-sm font-medium text-slate-800">{formatFriendlyDate(row.orderDate)}</p>
+                            </td>
+                            <td className="px-6 py-5 border-r border-b border-slate-100 last:border-r-0">
+                              <p className="text-sm font-medium text-slate-800">{formatFriendlyDate(row.deliveryDate)}</p>
+                              <p className="mt-1 text-[10px] font-medium text-slate-400 tracking-wide">{formatDeliveryDelta(row.orderDate, row.deliveryDate)}</p>
+                            </td>
+                            <td className="px-6 py-5 border-b border-slate-100 last:border-r-0">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${paymentTone}`}>
+                                <span className={`w-1 h-1 rounded-full mr-1.5 ${row.paymentStatus === 'Paid' ? 'bg-emerald-500' : (row.paymentStatus === 'Partial' ? 'bg-amber-500' : 'bg-rose-500')}`} />
+                                {row.paymentStatus}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
               </div>
             </div>
-          )}
+          </div>
+
         </div>
 
         {/* ── Product Cards Grid ── */}
         <div className="border-t border-slate-100 bg-gradient-to-b from-white to-slate-50/60 px-6 py-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
-                <ShieldCheck size={12} />
-                Past Results Intelligence
-              </div>
-              <h3 className="mt-3 text-[20px] font-semibold text-slate-900">
-                Customer order, delivery, and payment history
-              </h3>
-              <p className="mt-1 text-[13px] text-slate-500">
-                Selected {timeGranularity} ka complete customer stock ledger yahan clear breakdown mein dikh raha hai.
-              </p>
-            </div>
-
-            <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <div className="flex items-center gap-3">
-                <Search size={15} className="text-slate-400" />
-                <input
-                  value={historySearchTerm}
-                  onChange={(e) => setHistorySearchTerm(e.target.value)}
-                  placeholder="Search customer, stock, order id, payment..."
-                  className="w-full bg-transparent text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none"
-                />
-                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                  {filteredHistoryRows.length} rows
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-            {[
-              {
-                label: 'Customers',
-                value: historySummary.customerCount,
-                hint: `${historySummary.stockCount} stocks in selected window`,
-                icon: Users,
-                tone: 'text-sky-600 bg-sky-50 border-sky-200',
-              },
-              {
-                label: 'Units Ordered',
-                value: formatUnits(historySummary.quantity),
-                hint: `${filteredHistoryRows.length} order rows`,
-                icon: Box,
-                tone: 'text-violet-600 bg-violet-50 border-violet-200',
-              },
-              {
-                label: 'Order Value',
-                value: formatCompactCurrency(historySummary.totalAmount),
-                hint: 'Total billed amount',
-                icon: CircleDollarSign,
-                tone: 'text-emerald-600 bg-emerald-50 border-emerald-200',
-              },
-              {
-                label: 'Payment Received',
-                value: formatCompactCurrency(historySummary.paidAmount),
-                hint: `${historySummary.paidOrders} fully paid orders`,
-                icon: CheckCircle2,
-                tone: 'text-teal-600 bg-teal-50 border-teal-200',
-              },
-              {
-                label: 'Pending Balance',
-                value: formatCompactCurrency(historySummary.pendingAmount),
-                hint: `${historySummary.partialOrders + historySummary.pendingOrders} orders need follow-up`,
-                icon: Activity,
-                tone: 'text-amber-700 bg-amber-50 border-amber-200',
-              },
-            ].map((card) => {
-              const Icon = card.icon;
-              return (
-                <div key={card.label} className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{card.label}</p>
-                      <p className="mt-2 text-[20px] font-black tracking-tight text-slate-900">{card.value}</p>
-                      <p className="mt-1 text-[11px] font-semibold text-slate-500">{card.hint}</p>
-                    </div>
-                    <div className={`flex h-11 w-11 items-center justify-center rounded-2xl border ${card.tone}`}>
-                      <Icon size={18} />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
 
           {timeGranularity === 'day' && (
-            <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[1.15fr_1.85fr]">
+            <div className="mt-5 grid grid-cols-1 gap-8">
               <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -2201,14 +2113,20 @@ const ForecastViewer = () => {
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1020px]">
-                    <thead className="bg-white">
-                      <tr className="text-left">
-                        {['Time', 'Stock', 'Customer', 'Sold Qty', 'Sale Value', 'Stock Left', 'Reference'].map((label) => (
-                          <th key={label} className="px-4 py-3 text-[11px] font-black uppercase tracking-[0.12em] text-slate-500">
-                            {label}
-                          </th>
-                        ))}
+                  <table className="w-full min-w-full border-separate border-spacing-0">
+                    <thead className="bg-slate-50/80">
+                      <tr>
+                        {['Time', 'Stock', 'Customer', 'Sold Qty', 'Sale Value', 'Stock Left'].map((label) => {
+                          const isNumeric = ['Sold Qty', 'Sale Value', 'Stock Left'].includes(label);
+                          return (
+                            <th
+                              key={label}
+                              className={`px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 whitespace-nowrap border-r border-b border-slate-200/60 last:border-r-0 ${isNumeric ? 'text-right' : 'text-left'}`}
+                            >
+                              {label}
+                            </th>
+                          );
+                        })}
                       </tr>
                     </thead>
                     <tbody>
@@ -2228,16 +2146,15 @@ const ForecastViewer = () => {
                         </tr>
                       ) : (
                         dayTimelineRows.map((row) => (
-                          <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/70">
-                            <td className="px-4 py-4 text-sm font-black text-slate-900">{row.timeLabel}</td>
-                            <td className="px-4 py-4 text-sm font-bold text-slate-800">{row.stockName}</td>
-                            <td className="px-4 py-4 text-sm font-semibold text-slate-700">{row.customerName}</td>
-                            <td className="px-4 py-4 text-sm font-black text-slate-900">{formatUnits(row.quantity)} units</td>
-                            <td className="px-4 py-4 text-sm font-bold text-emerald-700">{formatCurrency(row.amount || 0)}</td>
-                            <td className="px-4 py-4 text-sm font-bold text-slate-800">
-                              {row.stockLeft != null ? `${formatUnits(row.stockLeft)} units` : 'Not available'}
+                          <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="px-6 py-5 text-sm font-bold text-slate-900 border-r border-b border-slate-100 last:border-r-0">{row.timeLabel}</td>
+                            <td className="px-6 py-5 text-sm font-medium text-slate-700 border-r border-b border-slate-100 last:border-r-0">{row.stockName}</td>
+                            <td className="px-6 py-5 text-sm font-medium text-slate-600 border-r border-b border-slate-100 last:border-r-0">{row.customerName}</td>
+                            <td className="px-6 py-5 text-right text-sm font-bold text-slate-900 tabular-nums border-r border-b border-slate-100 last:border-r-0">{formatUnits(row.quantity)} units</td>
+                            <td className="px-6 py-5 text-right text-sm font-bold text-emerald-600 tabular-nums border-r border-b border-slate-100 last:border-r-0">{formatCurrency(row.amount || 0)}</td>
+                            <td className="px-6 py-5 text-right text-sm font-bold text-slate-900 tabular-nums border-b border-slate-100 last:border-r-0">
+                              {row.stockLeft != null ? `${formatUnits(row.stockLeft)} units` : <span className="text-slate-300">--</span>}
                             </td>
-                            <td className="px-4 py-4 text-[11px] font-semibold text-slate-500">{row.orderId}</td>
                           </tr>
                         ))
                       )}
@@ -2248,144 +2165,7 @@ const ForecastViewer = () => {
             </div>
           )}
 
-          <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_2.2fr]">
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Key Accounts</p>
-                  <h4 className="mt-2 text-lg font-black text-slate-900">Top customers in this period</h4>
-                </div>
-                <div className="rounded-2xl bg-slate-50 px-3 py-2 text-right">
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Window</p>
-                  <p className="mt-1 text-sm font-bold text-slate-800">{selectionLabel}</p>
-                </div>
-              </div>
 
-              <div className="mt-4 space-y-3">
-                {topHistoryCustomers.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
-                    <p className="text-sm font-semibold text-slate-500">Selected filter ke liye customer-level order history abhi available nahi hai.</p>
-                  </div>
-                ) : (
-                  topHistoryCustomers.map((customer, index) => (
-                    <div key={`${customer.customerId}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-[13px] font-black uppercase tracking-tight text-slate-900">{customer.customerName}</p>
-                          <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                            {customer.orders} orders • {formatUnits(customer.quantity)} units
-                          </p>
-                        </div>
-                        <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-600 shadow-sm">
-                          #{index + 1}
-                        </span>
-                      </div>
-
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <div className="rounded-xl border border-white bg-white px-3 py-2">
-                          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Billed</p>
-                          <p className="mt-1 text-sm font-bold text-slate-900">{formatCurrency(customer.totalAmount)}</p>
-                        </div>
-                        <div className="rounded-xl border border-white bg-white px-3 py-2">
-                          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Pending</p>
-                          <p className={`mt-1 text-sm font-bold ${customer.pendingAmount > 0 ? 'text-amber-700' : 'text-emerald-600'}`}>
-                            {formatCurrency(customer.pendingAmount)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <p className="mt-3 text-[11px] font-medium text-slate-500">
-                        Latest order: <span className="font-bold text-slate-700">{formatFriendlyDate(customer.latestOrderDate)}</span>
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-5 py-4">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Detailed Ledger</p>
-                  <h4 className="mt-1 text-lg font-black text-slate-900">Who bought what, when, and payment status</h4>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600">
-                  <Truck size={14} className="text-emerald-500" />
-                  Delivery + payment timeline
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[1180px]">
-                  <thead className="bg-white">
-                    <tr className="text-left">
-                      {['Customer', 'Stock', 'Qty', 'Order Value', 'Paid', 'Pending', 'Order Date', 'Delivery', 'Payment', 'Reference'].map((label) => (
-                        <th key={label} className="px-4 py-3 text-[11px] font-black uppercase tracking-[0.12em] text-slate-500">
-                          {label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredHistoryRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={10} className="px-4 py-12 text-center">
-                          <div className="mx-auto max-w-md">
-                            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600">
-                              <ShieldCheck size={26} />
-                            </div>
-                            <p className="mt-4 text-base font-black text-slate-900">No past result rows for selected filter</p>
-                            <p className="mt-2 text-sm text-slate-500">
-                              Agar uploaded sheet mein customer, product, quantity, order/delivery ya payment columns honge to yeh section automatically populate ho jayega.
-                            </p>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredHistoryRows.map((row) => {
-                        const paymentTone = row.paymentStatus === 'Paid'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : (row.paymentStatus === 'Partial'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-rose-50 text-rose-700 border-rose-200');
-
-                        return (
-                          <tr key={row.id} className="border-t border-slate-100 align-top hover:bg-slate-50/70">
-                            <td className="px-4 py-4">
-                              <p className="text-sm font-black text-slate-900">{row.customerName}</p>
-                              <p className="mt-1 text-[11px] font-semibold text-slate-500">{row.customerId}</p>
-                            </td>
-                            <td className="px-4 py-4">
-                              <p className="text-sm font-bold text-slate-800">{row.stockName}</p>
-                            </td>
-                            <td className="px-4 py-4 text-sm font-bold text-slate-800">{formatUnits(row.quantity)}</td>
-                            <td className="px-4 py-4 text-sm font-bold text-slate-800">{formatCurrency(row.totalAmount || 0)}</td>
-                            <td className="px-4 py-4 text-sm font-bold text-emerald-700">{formatCurrency(row.paidAmount || 0)}</td>
-                            <td className="px-4 py-4 text-sm font-bold text-amber-700">{formatCurrency(row.pendingAmount || 0)}</td>
-                            <td className="px-4 py-4">
-                              <p className="text-sm font-semibold text-slate-800">{formatFriendlyDate(row.orderDate)}</p>
-                            </td>
-                            <td className="px-4 py-4">
-                              <p className="text-sm font-semibold text-slate-800">{formatFriendlyDate(row.deliveryDate)}</p>
-                              <p className="mt-1 text-[11px] text-slate-500">{formatDeliveryDelta(row.orderDate, row.deliveryDate)}</p>
-                            </td>
-                            <td className="px-4 py-4">
-                              <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${paymentTone}`}>
-                                {row.paymentStatus}
-                              </span>
-                            </td>
-                            <td className="px-4 py-4 text-[11px] font-semibold text-slate-500">
-                              {row.orderId || 'Auto-detected'}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div className="p-6 border-t border-slate-100 dark:border-white/10 mt-2">
@@ -2434,7 +2214,7 @@ const ForecastViewer = () => {
         </div>
       </GlassCard>
 
-      {/* ── Detail Modal ── */}
+      {/* â”€â”€ Detail Modal â”€â”€ */}
       <AnimatePresence>
         {showDetail && selectedProduct && (
           <motion.div
@@ -2494,7 +2274,7 @@ const ForecastViewer = () => {
                               Analysis-backed weekly demand outlook with operational plan
                             </p>
                             <p className="text-[11px] text-slate-400 mt-2 font-semibold">
-                              {selectedProduct.sku ? `SKU: ${selectedProduct.sku} • ` : ''}{weeks.length} forecast windows
+                              {selectedProduct.sku ? `SKU: ${selectedProduct.sku} â€¢ ` : ''}{weeks.length} forecast windows
                             </p>
                           </div>
                         </div>
@@ -2702,7 +2482,7 @@ const ForecastViewer = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Trends Modal ── */}
+      {/* â”€â”€ Trends Modal â”€â”€ */}
       <AnimatePresence>
         {showTrends && (
           <motion.div
@@ -2722,85 +2502,71 @@ const ForecastViewer = () => {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-emerald-50/40 px-5 py-5 sm:px-8 sm:py-6">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-200 flex items-center justify-center text-emerald-600">
-                      <BarChart3 size={20} />
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex min-w-0 items-start gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 shadow-sm shadow-emerald-500/5">
+                      <BarChart3 size={22} />
                     </div>
                     <div className="min-w-0">
-                      <h4 className="text-xl font-black tracking-tight text-slate-900">Top Trending Products</h4>
-                      <p className="text-xs font-semibold tracking-wide text-slate-500 mt-1">
-                        Demand projection for the next {trendSummary.windowSize} weeks
+                      <h4 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">Top Trending Products</h4>
+                      <p className="text-[11px] font-bold tracking-[0.1em] uppercase text-slate-500 mt-1.5 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Next {trendSummary.windowSize} weeks projection
                       </p>
                     </div>
                   </div>
-                  <div className="ml-auto flex items-center gap-2">
-                    <div className="inline-flex items-center rounded-xl p-1 bg-white border border-slate-200 shadow-sm">
+                  <div className="ml-auto flex items-center gap-3">
+                    <div className="inline-flex items-center rounded-2xl p-1 bg-white border border-slate-200 shadow-sm">
                       <button
-                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors ${!showAllTrends ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${!showAllTrends ? 'bg-slate-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
                         onClick={() => setShowAllTrends(false)}
                       >
-                        <Eye size={13} />
+                        <BarChart3 size={14} />
                         Chart
                       </button>
+
                       <button
-                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors ${showAllTrends ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${showAllTrends ? 'bg-slate-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
                         onClick={() => setShowAllTrends(true)}
                       >
-                        <List size={13} />
+                        <List size={14} />
                         Ranked Table
                       </button>
                     </div>
                     <button
-                      className="p-2 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+                      className="p-2.5 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
                       onClick={() => setShowTrends(false)}
                       aria-label="Close trends"
                     >
-                      <X size={14} />
+                      <X size={18} />
                     </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 mt-5 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Total Forecast Units</p>
-                    <p className="text-lg font-black text-slate-900 mt-1 tabular-nums">{formatUnits(trendSummary.totalUnits)}</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Avg Weekly Demand</p>
-                    <p className="text-lg font-black text-slate-900 mt-1 tabular-nums">{formatUnits(trendSummary.avgUnitsPerWindow)}</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Top Product</p>
-                    <p className="text-sm font-extrabold text-slate-900 mt-1 truncate">{trendSummary.topProduct}</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Sales by date</p>
-                      <p className="text-xs text-slate-500 mt-1">Check exact sold units by day, month, or year.</p>
+                {/* ── Trend Analysis Control Bar ── */}
+                <div className="mt-8 flex flex-wrap items-stretch gap-4">
+                  <div className="flex grow items-center gap-2 rounded-[2rem] border border-slate-200 bg-slate-50/50 p-1.5 shadow-sm transition-all focus-within:border-emerald-500/50 focus-within:ring-4 focus-within:ring-emerald-500/10 sm:p-2">
+                    <div className="flex items-center gap-1 rounded-2xl bg-white p-1 shadow-sm border border-slate-100">
+                      {['day', 'month', 'year'].map((option) => (
+                        <button
+                          key={option}
+                          onClick={() => setTrendTimeGranularity(option)}
+                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all duration-300 ${trendTimeGranularity === option ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                        >
+                          {option}
+                        </button>
+                      ))}
                     </div>
-                    <div className="inline-flex items-center gap-2">
-                      <div className="inline-flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
-                        {['day', 'month', 'year'].map((option) => (
-                          <button
-                            key={option}
-                            onClick={() => setTrendTimeGranularity(option)}
-                            className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${trendTimeGranularity === option ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'}`}
-                          >
-                            {option}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-2 py-1.5">
+                    <div className="h-8 w-[1px] bg-slate-200/60 mx-1 hidden sm:block" />
+                    <div className="flex grow items-center gap-3 px-3">
+                      <Search size={18} className="text-slate-400" />
+                      <div className="flex grow items-center gap-2">
                         {trendTimeGranularity === 'day' && (
                           <input
                             type="date"
                             value={trendSelectedDay}
                             onChange={(e) => setTrendSelectedDay(e.target.value)}
-                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[12px] text-slate-700 focus:border-slate-400 focus:outline-none"
+                            className="w-full border-0 bg-transparent py-2 text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:outline-none"
                           />
                         )}
                         {trendTimeGranularity === 'month' && (
@@ -2808,19 +2574,17 @@ const ForecastViewer = () => {
                             type="month"
                             value={trendSelectedMonth}
                             onChange={(e) => setTrendSelectedMonth(e.target.value)}
-                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[12px] text-slate-700 focus:border-slate-400 focus:outline-none"
+                            className="w-full border-0 bg-transparent py-2 text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:outline-none"
                           />
                         )}
                         {trendTimeGranularity === 'year' && (
                           <select
                             value={trendSelectedYear}
                             onChange={(e) => setTrendSelectedYear(e.target.value)}
-                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[12px] text-slate-700 focus:border-slate-400 focus:outline-none"
+                            className="w-full border-0 bg-transparent py-2 text-sm font-bold text-slate-700 focus:outline-none cursor-pointer appearance-none"
                           >
                             {availableTrendYears.map((yearValue) => (
-                              <option key={yearValue} value={String(yearValue)}>
-                                {yearValue}
-                              </option>
+                              <option key={yearValue} value={String(yearValue)}>{yearValue}</option>
                             ))}
                           </select>
                         )}
@@ -2828,122 +2592,148 @@ const ForecastViewer = () => {
                     </div>
                   </div>
 
-                  <div className="mt-3 rounded-xl border border-slate-200 overflow-hidden">
-                    <div className="flex items-center justify-between bg-slate-50 px-3 py-2 border-b border-slate-200">
-                      <p className="text-[11px] font-semibold text-slate-600">Selected sales rows</p>
-                      <p className="text-[11px] font-semibold text-slate-700">
-                        Total sold: {formatUnits(trendSalesTotal)} units
-                      </p>
+                  <div className="flex items-center gap-3 rounded-[2rem] border border-slate-200 bg-white px-6 py-2 shadow-sm">
+                    <div className="text-right">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Volume</p>
+                      <p className="text-sm font-black text-slate-900 tabular-nums">{formatUnits(trendSalesTotal)} <span className="text-[10px] text-slate-400 font-bold uppercase ml-0.5">Units</span></p>
                     </div>
-                    <div className="max-h-44 overflow-y-auto">
-                      {trendSalesRows.length === 0 ? (
-                        <p className="px-3 py-4 text-sm text-slate-500">No sales data available for selected date filter.</p>
-                      ) : (
-                        <table className="w-full">
-                          <thead className="bg-white sticky top-0">
-                            <tr>
-                              <th className="px-3 py-2 text-left text-[11px] font-semibold text-slate-500">Date</th>
-                              <th className="px-3 py-2 text-right text-[11px] font-semibold text-slate-500">Units sold</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {trendSalesRows.map((row, idx) => (
-                              <tr key={`${row.period}-${idx}`} className="border-t border-slate-100">
-                                <td className="px-3 py-2 text-sm text-slate-700">{row.period}</td>
-                                <td className="px-3 py-2 text-sm font-semibold text-slate-800 text-right">
-                                  {formatUnits(row.actual || 0)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
+                    <div className="h-8 w-[1px] bg-slate-200" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
+                      <TrendingUp size={18} />
                     </div>
                   </div>
                 </div>
+
+                <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-3">
+                  <div className="group rounded-[2.5rem] border border-slate-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-emerald-200/60">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-500 transition-colors">
+                        <Box size={20} />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-300 group-hover:text-emerald-300 transition-colors">Forecast</span>
+                    </div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Total Units</p>
+                    <p className="text-3xl font-black text-slate-900 mt-2 tabular-nums">{formatUnits(trendSummary.totalUnits)}</p>
+                  </div>
+                  <div className="group rounded-[2.5rem] border border-slate-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-violet-200/60">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-violet-50 group-hover:text-violet-500 transition-colors">
+                        <Activity size={20} />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-300 group-hover:text-violet-300 transition-colors">Average</span>
+                    </div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Weekly Demand</p>
+                    <p className="text-3xl font-black text-slate-900 mt-2 tabular-nums">{formatUnits(trendSummary.avgUnitsPerWindow)}</p>
+                  </div>
+                  <div className="group rounded-[2.5rem] border border-slate-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-sky-200/60">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-sky-50 group-hover:text-sky-500 transition-colors">
+                        <Star size={20} />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-300 group-hover:text-sky-300 transition-colors">Leader</span>
+                    </div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Top Product</p>
+                    <p className="text-lg font-black text-slate-900 mt-2 truncate leading-tight">{trendSummary.topProduct}</p>
+                  </div>
+                </div>
+
               </div>
 
               {!showAllTrends && (
                 <div className="max-h-[calc(94vh-300px)] overflow-y-auto px-5 py-6 sm:px-8">
                   <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50/40 p-4">
-                    <p className="text-[11px] font-black uppercase tracking-[0.15em] text-slate-500 mb-3">Top 5 Demand Leaders</p>
-                    <div className="h-[260px]">
-                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                        <BarChart data={trendData} margin={{ top: 18, right: 8, left: 8, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
-                          <Tooltip
-                            cursor={{ fill: 'rgba(15, 23, 42, 0.03)' }}
-                            contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 10px 30px rgba(15,23,42,0.08)', fontSize: '11px', color: '#0f172a' }}
-                            labelStyle={{ color: '#334155', fontWeight: 700 }}
-                            formatter={(value) => [`${formatUnits(value)} units`, 'Projected demand']}
-                            labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
-                          />
-                          <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={24}>
-                            {trendData.map((entry) => (
-                              <Cell key={entry.name} fill={entry.color} fillOpacity={0.9} />
-                            ))}
-                            <LabelList
-                              dataKey="value"
-                              position="top"
-                              formatter={(value) => formatUnits(value)}
-                              style={{ fill: '#334155', fontSize: 10, fontWeight: 700 }}
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/40 p-4">
+                      <p className="text-[11px] font-black uppercase tracking-[0.15em] text-slate-500 mb-3">Top 5 Demand Leaders</p>
+                      <div className="h-[260px]">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                          <BarChart data={trendData} margin={{ top: 18, right: 8, left: 8, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
+                            <Tooltip
+                              cursor={{ fill: 'rgba(15, 23, 42, 0.03)' }}
+                              contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 10px 30px rgba(15,23,42,0.08)', fontSize: '11px', color: '#0f172a' }}
+                              labelStyle={{ color: '#334155', fontWeight: 700 }}
+                              formatter={(value) => [`${formatUnits(value)} units`, 'Projected demand']}
+                              labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
                             />
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
+                            <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={24}>
+                              {trendData.map((entry) => (
+                                <Cell key={entry.name} fill={entry.color} fillOpacity={0.9} />
+                              ))}
+                              <LabelList
+                                dataKey="value"
+                                position="top"
+                                formatter={(value) => formatUnits(value)}
+                                style={{ fill: '#334155', fontSize: 10, fontWeight: 700 }}
+                              />
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-[11px] font-black uppercase tracking-[0.15em] text-slate-500 mb-3">Ranking Snapshot</p>
-                    <div className="space-y-2.5">
-                      {allTrends.slice(0, 5).map((item, index) => {
-                        const share = trendSummary.totalUnits > 0
-                          ? Math.round((Number(item.value || 0) / trendSummary.totalUnits) * 100)
-                          : 0;
-                        return (
-                          <div key={`${item.name}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center ${index === 0 ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-700'}`}>{index + 1}</span>
-                                  <p className="text-sm font-bold text-slate-800 truncate">{item.name}</p>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <p className="text-[11px] font-black uppercase tracking-[0.15em] text-slate-500 mb-3">Ranking Snapshot</p>
+                      <div className="space-y-3">
+                        {allTrends.slice(0, 5).map((item, index) => {
+                          const share = trendSummary.totalUnits > 0
+                            ? Math.round((Number(item.value || 0) / trendSummary.totalUnits) * 100)
+                            : 0;
+                          return (
+                            <div key={`${item.name}-${index}`} className="rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-sm hover:border-emerald-200 transition-colors group">
+                              <div className="flex items-center justify-between gap-4">
+                                <div className="flex min-w-0 items-center gap-4">
+                                  <span className={`w-8 h-8 rounded-full text-xs font-black flex items-center justify-center border ${index === 0 ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-slate-50 border-slate-100 text-slate-500'}`}>{index + 1}</span>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-bold text-slate-900 truncate group-hover:text-emerald-600 transition-colors">{item.name}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-wider">{share}% of demand</p>
+                                  </div>
                                 </div>
-                                <p className="text-[11px] text-slate-500 mt-1">{share}% of total projected demand</p>
+                                <div className="text-right">
+                                  <p className="text-sm font-black text-slate-900 tabular-nums">{formatUnits(item.value)}</p>
+                                  <p className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-wider">units</p>
+                                </div>
                               </div>
-                              <p className="text-sm font-black text-slate-900 tabular-nums">{formatUnits(item.value)}</p>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
                   </div>
                 </div>
               )}
 
               {showAllTrends && (
                 <div className="max-h-[calc(94vh-300px)] overflow-auto px-5 py-5 sm:px-8">
-                  <div className="grid grid-cols-[72px_1fr_160px_120px] gap-3 items-center text-[11px] font-black text-slate-500 uppercase tracking-[0.14em] pb-3 border-b border-slate-200">
-                    <span>Rank</span>
-                    <span>Product</span>
-                    <span className="text-right">Forecast Units</span>
-                    <span className="text-right">Share</span>
-                  </div>
-                  <div className="divide-y divide-slate-100">
-                    {allTrends.slice(0, 100).map((item, index) => (
-                      <div key={`${item.name}-${index}`} className="grid grid-cols-[72px_1fr_160px_120px] gap-3 items-center py-3">
-                        <span className="text-xs font-bold text-slate-600">#{index + 1}</span>
-                        <span className="text-sm font-semibold text-slate-800 truncate">{item.name}</span>
-                        <span className="text-sm font-bold text-slate-800 tabular-nums text-right">{formatUnits(item.value)} units</span>
-                        <span className="text-xs font-semibold text-slate-500 tabular-nums text-right">
-                          {trendSummary.totalUnits > 0 ? `${Math.round((Number(item.value || 0) / trendSummary.totalUnits) * 100)}%` : '0%'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  <table className="w-full border-separate border-spacing-0">
+                    <thead className="bg-slate-50 sticky top-0 z-10">
+                      <tr>
+                        {['Rank', 'Product', 'Forecast Units', 'Share'].map((label) => {
+                          const isNumeric = ['Forecast Units', 'Share'].includes(label);
+                          return (
+                            <th
+                              key={label}
+                              className={`px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 border-b border-r border-slate-200 last:border-r-0 ${isNumeric ? 'text-right' : 'text-left'}`}
+                            >
+                              {label}
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {allTrends.slice(0, 100).map((item, index) => (
+                        <tr key={`${item.name}-${index}`} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 border-r border-b border-slate-100 text-xs font-black text-slate-400">#{index + 1}</td>
+                          <td className="px-6 py-4 border-r border-b border-slate-100 text-sm font-bold text-slate-800 truncate">{item.name}</td>
+                          <td className="px-6 py-4 border-r border-b border-slate-100 text-sm font-black text-slate-900 tabular-nums text-right">{formatUnits(item.value)} units</td>
+                          <td className="px-6 py-4 border-b border-slate-100 text-sm font-bold text-emerald-600 tabular-nums text-right">
+                            {trendSummary.totalUnits > 0 ? `${Math.round((Number(item.value || 0) / trendSummary.totalUnits) * 100)}%` : '0%'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </motion.div>

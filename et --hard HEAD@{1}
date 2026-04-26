@@ -1,0 +1,13 @@
+[33m5db4d3e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{0}: reset: moving to 5db4d3e
+[33m85a7f12[m HEAD@{1}: reset: moving to 85a7f12
+[33m5db4d3e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{2}: reset: moving to 5db4d3e
+[33m85a7f12[m HEAD@{3}: reset: moving to 85a7f12
+[33me637754[m HEAD@{4}: reset: moving to HEAD
+[33me637754[m HEAD@{5}: reset: moving to HEAD
+[33me637754[m HEAD@{6}: reset: moving to e637754
+[33m5026f56[m[33m ([m[1;31morigin/main[m[33m)[m HEAD@{7}: reset: moving to HEAD
+[33m5026f56[m[33m ([m[1;31morigin/main[m[33m)[m HEAD@{8}: commit: updated 5
+[33me637754[m HEAD@{9}: commit: init
+[33m85a7f12[m HEAD@{10}: commit: up1223
+[33m5db4d3e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{11}: Branch: renamed refs/heads/master to refs/heads/main
+[33m5db4d3e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{13}: commit (initial): init

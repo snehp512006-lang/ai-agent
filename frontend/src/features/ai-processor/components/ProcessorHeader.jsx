@@ -56,62 +56,64 @@ const ProcessorHeader = ({
           </div>
         </div>
       </div>
-
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-8 bg-[var(--bg-sidebar)] px-8 py-3 rounded-2xl border border-[var(--border-subtle)] shadow-sm">
-          <div className="text-center">
-            <div className="text-xl font-mono font-black text-rose-500">{stats.anomalies}</div>
-            <div className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest">Business Risks</div>
+      
+      {status !== 'IDLE' && status !== 'UPLOADING' && (
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-8 bg-[var(--bg-sidebar)] px-8 py-3 rounded-2xl border border-[var(--border-subtle)] shadow-sm">
+            <div className="text-center">
+              <div className="text-xl font-mono font-black text-rose-500">{stats.anomalies}</div>
+              <div className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest">Business Risks</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-mono font-black text-emerald-500">{stats.cleaned}</div>
+              <div className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest">Items Fixed</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-mono font-black text-blue-500">{stats.predictions}</div>
+              <div className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest">Forecasts</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-mono font-black text-purple-500">{stats.verified}</div>
+              <div className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest">Audit Passed</div>
+            </div>
           </div>
-          <div className="text-center">
-            <div className="text-xl font-mono font-black text-emerald-500">{stats.cleaned}</div>
-            <div className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest">Items Fixed</div>
-          </div>
-          <div className="text-center">
-            <div className="text-xl font-mono font-black text-blue-500">{stats.predictions}</div>
-            <div className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest">Forecasts</div>
-          </div>
-          <div className="text-center">
-            <div className="text-xl font-mono font-black text-purple-500">{stats.verified}</div>
-            <div className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest">Audit Passed</div>
-          </div>
-        </div>
 
-        {(status === 'READY' || status === 'HALTED') && (
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={onStartProcessing}
-            title={status === 'HALTED' ? 'Resume Pipeline' : 'Initialize Pipeline'}
-            className={`bg-emerald-500 w-12 h-12 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 ${isLight ? 'text-white' : 'text-slate-950'}`}
-          >
-            <Zap size={20} fill="currentColor" />
-          </motion.button>
-        )}
-
-        {(status === 'READY' || status === 'COMPLETED' || status === 'HALTED') && (
-          <button
-            onClick={onResetToIdle}
-            title="Upload New Sheet"
-            aria-label="Upload New Sheet"
-            className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center hover:bg-blue-500/20 active:scale-95 transition-all"
-          >
-            <Upload size={20} />
-          </button>
-        )}
-
-        {(status === 'COMPLETED' || status === 'HALTED') && (
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onRequestReAnalyze}
-              title="Re-Analyze"
-              className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center hover:bg-white/10 hover:text-white transition-all active:scale-95"
+          {(status === 'READY' || status === 'HALTED') && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onStartProcessing}
+              title={status === 'HALTED' ? 'Resume Pipeline' : 'Initialize Pipeline'}
+              className={`bg-emerald-500 w-12 h-12 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 ${isLight ? 'text-white' : 'text-slate-950'}`}
             >
-              <RefreshCw size={20} />
+              <Zap size={20} fill="currentColor" />
+            </motion.button>
+          )}
+
+          {(status === 'READY' || status === 'COMPLETED' || status === 'HALTED') && (
+            <button
+              onClick={onResetToIdle}
+              title="Upload New Sheet"
+              aria-label="Upload New Sheet"
+              className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center hover:bg-blue-500/20 active:scale-95 transition-all"
+            >
+              <Upload size={20} />
             </button>
-          </div>
-        )}
-      </div>
+          )}
+
+          {(status === 'COMPLETED' || status === 'HALTED') && (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onRequestReAnalyze}
+                title="Re-Analyze"
+                className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center hover:bg-white/10 hover:text-white transition-all active:scale-95"
+              >
+                <RefreshCw size={20} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </header>
   );
 };

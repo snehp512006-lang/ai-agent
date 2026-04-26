@@ -54,17 +54,23 @@ const AnalysisSummaryPanel = ({
               )}
             </div>
 
-            {hybridResult.metadata?.ingestion_report?.length > 0 && (
+            {((Array.isArray(hybridResult.metadata?.ingestion_report) && hybridResult.metadata.ingestion_report.length > 0) || 
+              (Array.isArray(hybridResult.metadata?.sheet_diagnostics) && hybridResult.metadata.sheet_diagnostics.length > 0) ||
+              (Array.isArray(hybridResult.metadata?.sheet_analysis_summary) && hybridResult.metadata.sheet_analysis_summary.length > 0)) && (
               <div className="mt-4 p-4 border border-rose-500/20 bg-rose-500/5 rounded-2xl">
-                <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                  <AlertCircle size={12} />
-                  AI Audit Warnings ({hybridResult.metadata.ingestion_report.filter((r) => r.includes('WARNING')).length})
-                </h4>
-                <ul className="space-y-1">
-                  {hybridResult.metadata.ingestion_report.map((report, i) => (
-                    <li key={i} className="text-[10px] text-slate-400 font-medium list-disc ml-4">{report}</li>
-                  ))}
-                </ul>
+                {Array.isArray(hybridResult.metadata?.ingestion_report) && hybridResult.metadata.ingestion_report.length > 0 && (
+                  <>
+                    <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <AlertCircle size={12} />
+                      AI Audit Warnings ({hybridResult.metadata.ingestion_report.filter((r) => r.includes('WARNING')).length})
+                    </h4>
+                    <ul className="space-y-1">
+                      {hybridResult.metadata.ingestion_report.map((report, i) => (
+                        <li key={i} className="text-[10px] text-slate-400 font-medium list-disc ml-4">{report}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
 
                 {Array.isArray(hybridResult.metadata?.sheet_diagnostics) && hybridResult.metadata.sheet_diagnostics.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-rose-500/20">
