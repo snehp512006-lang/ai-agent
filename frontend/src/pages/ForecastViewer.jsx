@@ -1913,96 +1913,104 @@ const ForecastViewer = () => {
           </div>
 
           <div className="mt-5 grid grid-cols-1 gap-6">
-
-
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-5 py-4">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Detailed Ledger</p>
-                  <h4 className="mt-1 text-lg font-black text-slate-900">Who bought what, when, and payment status</h4>
+            {forecastViewMode === 'chart' ? (
+              <PredictionChart
+                pastData={displayPastData}
+                forecastData={displayForecastData}
+                mode={forecastMode}
+                horizon={timeGranularity}
+                isAnalyzing={loading}
+              />
+            ) : (
+              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-5 py-4">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Detailed Ledger</p>
+                    <h4 className="mt-1 text-lg font-black text-slate-900">Who bought what, when, and payment status</h4>
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600">
+                    <Truck size={14} className="text-emerald-500" />
+                    Delivery + payment timeline
+                  </div>
                 </div>
-                <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600">
-                  <Truck size={14} className="text-emerald-500" />
-                  Delivery + payment timeline
-                </div>
-              </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-full border-separate border-spacing-0">
-                  <thead className="bg-slate-50/80">
-                    <tr>
-                      {['Customer', 'Stock', 'Qty', 'Order Value', 'Paid', 'Pending', 'Order Date', 'Delivery', 'Payment'].map((label) => {
-                        const isNumeric = ['Qty', 'Order Value', 'Paid', 'Pending'].includes(label);
-                        return (
-                          <th
-                            key={label}
-                            className={`px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 whitespace-nowrap border-r border-b border-slate-200/60 last:border-r-0 ${isNumeric ? 'text-right' : 'text-left'}`}
-                          >
-                            {label}
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredHistoryRows.length === 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-full border-separate border-spacing-0">
+                    <thead className="bg-slate-50/80">
                       <tr>
-                        <td colSpan={10} className="px-4 py-12 text-center">
-                          <div className="mx-auto max-w-md">
-                            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600">
-                              <ShieldCheck size={26} />
-                            </div>
-                            <p className="mt-4 text-base font-black text-slate-900">No past result rows for selected filter</p>
-                            <p className="mt-2 text-sm text-slate-500">
-                              Agar uploaded sheet mein customer, product, quantity, order/delivery ya payment columns honge to yeh section automatically populate ho jayega.
-                            </p>
-                          </div>
-                        </td>
+                        {['Customer', 'Stock', 'Qty', 'Order Value', 'Paid', 'Pending', 'Order Date', 'Delivery', 'Payment'].map((label) => {
+                          const isNumeric = ['Qty', 'Order Value', 'Paid', 'Pending'].includes(label);
+                          return (
+                            <th
+                              key={label}
+                              className={`px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 whitespace-nowrap border-r border-b border-slate-200/60 last:border-r-0 ${isNumeric ? 'text-right' : 'text-left'}`}
+                            >
+                              {label}
+                            </th>
+                          );
+                        })}
                       </tr>
-                    ) : (
-                      filteredHistoryRows.map((row) => {
-                        const paymentTone = row.paymentStatus === 'Paid'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : (row.paymentStatus === 'Partial'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-rose-50 text-rose-700 border-rose-200');
+                    </thead>
+                    <tbody>
+                      {filteredHistoryRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={10} className="px-4 py-12 text-center">
+                            <div className="mx-auto max-w-md">
+                              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600">
+                                <ShieldCheck size={26} />
+                              </div>
+                              <p className="mt-4 text-base font-black text-slate-900">No past result rows for selected filter</p>
+                              <p className="mt-2 text-sm text-slate-500">
+                                Agar uploaded sheet mein customer, product, quantity, order/delivery ya payment columns honge to yeh section automatically populate ho jayega.
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredHistoryRows.map((row) => {
+                          const paymentTone = row.paymentStatus === 'Paid'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : (row.paymentStatus === 'Partial'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-rose-50 text-rose-700 border-rose-200');
 
-                        return (
-                          <tr key={row.id} className="align-top hover:bg-slate-50/80 transition-colors">
-                            <td className="px-6 py-5 border-r border-b border-slate-100 last:border-r-0">
-                              <p className="text-sm font-bold text-slate-900">{row.customerName}</p>
-                              {row.customerId && row.customerId !== row.customerName && (
-                                <p className="mt-1 text-[10px] font-medium text-slate-400 tracking-wide">{row.customerId}</p>
-                              )}
-                            </td>
-                            <td className="px-6 py-5 border-r border-b border-slate-100 last:border-r-0">
-                              <p className="text-sm font-medium text-slate-700 leading-snug">{row.stockName}</p>
-                            </td>
-                            <td className="px-6 py-5 text-right text-sm font-bold text-slate-900 tabular-nums border-r border-b border-slate-100 last:border-r-0">{formatUnits(row.quantity)}</td>
-                            <td className="px-6 py-5 text-right text-sm font-bold text-slate-900 tabular-nums border-r border-b border-slate-100 last:border-r-0">{formatCurrency(row.totalAmount || 0)}</td>
-                            <td className="px-6 py-5 text-right text-sm font-bold text-emerald-600 tabular-nums border-r border-b border-slate-100 last:border-r-0">{formatCurrency(row.paidAmount || 0)}</td>
-                            <td className="px-6 py-5 text-right text-sm font-bold text-amber-600 tabular-nums border-r border-b border-slate-100 last:border-r-0">{formatCurrency(row.pendingAmount || 0)}</td>
-                            <td className="px-6 py-5 border-r border-b border-slate-100 last:border-r-0">
-                              <p className="text-sm font-medium text-slate-800">{formatFriendlyDate(row.orderDate)}</p>
-                            </td>
-                            <td className="px-6 py-5 border-r border-b border-slate-100 last:border-r-0">
-                              <p className="text-sm font-medium text-slate-800">{formatFriendlyDate(row.deliveryDate)}</p>
-                              <p className="mt-1 text-[10px] font-medium text-slate-400 tracking-wide">{formatDeliveryDelta(row.orderDate, row.deliveryDate)}</p>
-                            </td>
-                            <td className="px-6 py-5 border-b border-slate-100 last:border-r-0">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${paymentTone}`}>
-                                <span className={`w-1 h-1 rounded-full mr-1.5 ${row.paymentStatus === 'Paid' ? 'bg-emerald-500' : (row.paymentStatus === 'Partial' ? 'bg-amber-500' : 'bg-rose-500')}`} />
-                                {row.paymentStatus}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                          return (
+                            <tr key={row.id} className="align-top hover:bg-slate-50/80 transition-colors">
+                              <td className="px-6 py-5 border-r border-b border-slate-100 last:border-r-0">
+                                <p className="text-sm font-bold text-slate-900">{row.customerName}</p>
+                                {row.customerId && row.customerId !== row.customerName && (
+                                  <p className="mt-1 text-[10px] font-medium text-slate-400 tracking-wide">{row.customerId}</p>
+                                )}
+                              </td>
+                              <td className="px-6 py-5 border-r border-b border-slate-100 last:border-r-0">
+                                <p className="text-sm font-medium text-slate-700 leading-snug">{row.stockName}</p>
+                              </td>
+                              <td className="px-6 py-5 text-right text-sm font-bold text-slate-900 tabular-nums border-r border-b border-slate-100 last:border-r-0">{formatUnits(row.quantity)}</td>
+                              <td className="px-6 py-5 text-right text-sm font-bold text-slate-900 tabular-nums border-r border-b border-slate-100 last:border-r-0">{formatCurrency(row.totalAmount || 0)}</td>
+                              <td className="px-6 py-5 text-right text-sm font-bold text-emerald-600 tabular-nums border-r border-b border-slate-100 last:border-r-0">{formatCurrency(row.paidAmount || 0)}</td>
+                              <td className="px-6 py-5 text-right text-sm font-bold text-amber-600 tabular-nums border-r border-b border-slate-100 last:border-r-0">{formatCurrency(row.pendingAmount || 0)}</td>
+                              <td className="px-6 py-5 border-r border-b border-slate-100 last:border-r-0">
+                                <p className="text-sm font-medium text-slate-800">{formatFriendlyDate(row.orderDate)}</p>
+                              </td>
+                              <td className="px-6 py-5 border-r border-b border-slate-100 last:border-r-0">
+                                <p className="text-sm font-medium text-slate-800">{formatFriendlyDate(row.deliveryDate)}</p>
+                                <p className="mt-1 text-[10px] font-medium text-slate-400 tracking-wide">{formatDeliveryDelta(row.orderDate, row.deliveryDate)}</p>
+                              </td>
+                              <td className="px-6 py-5 border-b border-slate-100 last:border-r-0">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${paymentTone}`}>
+                                  <span className={`w-1 h-1 rounded-full mr-1.5 ${row.paymentStatus === 'Paid' ? 'bg-emerald-500' : (row.paymentStatus === 'Partial' ? 'bg-amber-500' : 'bg-rose-500')}`} />
+                                  {row.paymentStatus}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
         </div>
